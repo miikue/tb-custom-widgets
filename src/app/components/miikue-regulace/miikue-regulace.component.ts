@@ -142,7 +142,9 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
       for (const match of matches) {
           const content = match[1];
           if (content.includes('=')) {
-              const parts = content.split(/\s+/);
+              // Support both legacy space-separated and new underscore-separated pairs.
+              // Split on whitespace or on "_" only when it starts another numeric key (e.g. _2=).
+              const parts = content.split(/(?:\s+|_(?=\d+=))/);
               parts.forEach(part => {
                   const eqIndex = part.indexOf('=');
                   if (eqIndex > -1) {
@@ -167,7 +169,9 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
       for (const match of matches) {
           const content = match[1];
           if (content.includes('=')) {
-              const parts = content.split(/\s+/);
+              // Support both legacy space-separated and new underscore-separated pairs.
+              // Split on whitespace or on "_" only when it starts another numeric key (e.g. _2=).
+              const parts = content.split(/(?:\s+|_(?=\d+=))/);
               parts.forEach(part => {
                   const eqIndex = part.indexOf('=');
                   if (eqIndex > -1) {

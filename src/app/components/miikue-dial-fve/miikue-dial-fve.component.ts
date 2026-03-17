@@ -163,8 +163,8 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
       const match = label.match(/\[(.*?)\]/);
       if (match && match[1]) {
           const content = match[1];
-          // Split by spaces to get "1=0%" items
-          const parts = content.split(/\s+/);
+          // Support both legacy and new naming separators (space/underscore)
+          const parts = content.split(/[\s_]+/);
           parts.forEach(part => {
              // Regex for key=value%
              const kvMatch = part.match(/(\d+)=(\d+)%?/);
