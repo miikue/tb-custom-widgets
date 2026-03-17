@@ -44,6 +44,8 @@ import { HttpParams } from '@angular/common/http';
 })
 export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestroy {
 
+  private readonly fallbackSuffixOrder = ['', '_min', '_30min', '_hour'];
+
   private _echartContainer: ElementRef<HTMLElement>;
   @ViewChild('echartContainer', {static: false}) set echartContainer(container: ElementRef<HTMLElement>) {
     if (container) {
@@ -259,8 +261,10 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     const datasource = this.ctx.datasources[0];
     if (!datasource.dataKeys || datasource.dataKeys.length === 0) return of({});
 
-    // Použití HttpParams pro správné enkódování [ ] a dalších znaků
-    const keysParam = datasource.dataKeys.map(k => k.name).join(',');
+    const fallbackChains = datasource.dataKeys.map(k => this.getFallbackKeyChain(k.name));
+    const requestedKeys = Array.from(new Set(fallbackChains.flat()));
+    const keysParam = requestedKeys.join(',');
+
     let params = new HttpParams()
       .set('keys', keysParam)
       .set('startTs', Math.floor(startTs).toString())
@@ -277,12 +281,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     return this.ctx.http.get(url, { params }).pipe(
       map((res: any) => {
         const result = {};
-        datasource.dataKeys.forEach((dk, index) => {
-          if (res[dk.name]) {
-            result[index] = res[dk.name].map(p => [p.ts, Number(p.value)]);
-          } else {
-            result[index] = [];
-          }
+        datasource.dataKeys.forEach((_, index) => {
+          result[index] = this.composeSeriesFromFallbackKeys(res, fallbackChains[index]);
         });
         return result;
       }),
@@ -291,6 +291,62 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
         return of({});
       })
     );
+  }
+
+  private getFallbackKeyChain(originalKey: string): string[] {
+    const matchedSuffix = this.fallbackSuffixOrder
+      .filter(suffix => suffix.length > 0)
+      .find(suffix => originalKey.endsWith(suffix));
+
+    if (matchedSuffix) {
+      const baseKey = originalKey.slice(0, originalKey.length - matchedSuffix.length);
+      const startIndex = this.fallbackSuffixOrder.indexOf(matchedSuffix);
+      return this.fallbackSuffixOrder.slice(startIndex).map(suffix => `${baseKey}${suffix}`);
+    }
+
+    return [
+      originalKey,
+      ...this.fallbackSuffixOrder
+        .filter(suffix => suffix.length > 0)
+        .map(suffix => `${originalKey}${suffix}`)
+    ];
+  }
+
+  private composeSeriesFromFallbackKeys(response: any, keyChain: string[]): [number, number][] {
+    const merged: [number, number][] = [];
+    let oldestTimestamp = Number.POSITIVE_INFINITY;
+
+    for (const keyName of keyChain) {
+      const points = this.parseTelemetryPoints(response?.[keyName]);
+      if (!points.length) {
+        continue;
+      }
+
+      if (!merged.length) {
+        merged.push(...points);
+        oldestTimestamp = points[0][0];
+        continue;
+      }
+
+      const olderOnly = points.filter(point => point[0] < oldestTimestamp);
+      if (olderOnly.length) {
+        merged.unshift(...olderOnly);
+        oldestTimestamp = olderOnly[0][0];
+      }
+    }
+
+    return merged;
+  }
+
+  private parseTelemetryPoints(series: any): [number, number][] {
+    if (!Array.isArray(series) || series.length === 0) {
+      return [];
+    }
+
+    return series
+      .map(point => [Number(point.ts), Number(point.value)] as [number, number])
+      .filter(point => Number.isFinite(point[0]) && Number.isFinite(point[1]))
+      .sort((a, b) => a[0] - b[0]);
   }
 
   private mergeDataToStore(newData: any, chunkStart: number, chunkEnd: number) {
