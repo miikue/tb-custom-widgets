@@ -1,0 +1,63 @@
+<div class="widget-card">
+  <!-- <a class="back-link">
+      <i class="material-icons">arrow_back</i> Zpět na index
+  </a> -->
+
+  <div class="gauge-container">
+      <svg viewBox="0 -15 200 160" preserveAspectRatio="xMidYMid meet" class="gauge-svg">
+          <!-- Background Track (Semi-circle from 180deg to 0deg/360deg) -->
+          <!-- 180 deg (Left) to 360 deg (Right) via Top -->
+          <!-- Path A: rx ry x-axis-rotation large-arc-flag sweep-flag x y -->
+          <!-- Start: (20, 100) -> 180 deg -->
+          <!-- End: (180, 100) -> 360 deg -->
+          <!-- Sweep 1 = clockwise. 180 -> 270 -> 360. Correct. -->
+          <path d="M 20 100 A 80 80 0 0 1 180 100" class="bg-arc" />
+          
+          <!-- Generated Ticks and Labels -->
+          <ng-container *ngFor="let tick of ticks">
+            <line [attr.x1]="tick.line.x1" [attr.y1]="tick.line.y1" 
+                  [attr.x2]="tick.line.x2" [attr.y2]="tick.line.y2" 
+                  class="center-zero-mark" /> <!-- Reusing zero-mark style as requested -->
+            
+            <text [attr.x]="tick.label.x" [attr.y]="tick.label.y" 
+                  [style.text-anchor]="tick.label.anchor"
+                  class="scale-label">{{ tick.label.text }}</text>
+          </ng-container>
+
+          <!-- Active Arcs (Static paths with dashoffset animation) -->
+          <!-- Delivery Arc: Top (270) to Left (180) -->
+          <path d="M 100 20 A 80 80 0 0 0 20 100" 
+                class="active-delivery" 
+                stroke-dasharray="126" 
+                [style.stroke]="pDeliveryColor"
+                [style.stroke-dashoffset]="deliveryOffset" />
+
+          <!-- Consumption Arc: Top (270) to Right (360) -->
+          <path d="M 100 20 A 80 80 0 0 1 180 100" 
+                class="active-consumption" 
+                stroke-dasharray="126" 
+                [style.stroke]="pConsumptionColor"
+                [style.stroke-dashoffset]="consumptionOffset" />
+
+          <!-- Text Labels inside SVG for Perfect Scaling -->
+          <text x="100" y="78" text-anchor="middle" class="svg-val-p" 
+                [style.fill]="!isOk ? badColor : (isDelivery ? pDeliveryColor : (_pValue !== 0 ? pConsumptionColor : '#1e293b'))">
+              {{ _pValue >= 0 || !isOk ? '' : '-' }}{{ displayValue }} <tspan class="svg-unit" font-size="0.6em" dy="0">{{ _unit }}</tspan>
+          </text>
+
+          <text x="100" y="98" text-anchor="middle" class="svg-val-q" 
+                [style.fill]="!isOk ? badColor : '#64748b'">
+              Q: {{ displayQValue }} {{ _qUnit }}
+          </text>
+
+          <!-- Status Footer Background -->
+          <rect x="0" y="118" width="200" height="25" rx="0"
+                [style.fill]="!isOk ? '#f3f4f6' : (isDelivery ? '#dcfce7' : (_pValue !== 0 ? '#ffedd5' : '#f1f5f9'))" />
+
+          <text x="100" y="135" text-anchor="middle" class="svg-status" 
+                [style.fill]="!isOk ? badColor : (isDelivery ? '#15803d' : (_pValue !== 0 ? '#ea580c' : '#64748b'))">
+              {{ statusText }}
+          </text>
+      </svg>
+  </div>
+</div>

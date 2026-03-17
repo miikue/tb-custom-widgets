@@ -1,0 +1,16 @@
+<div class="time-formatter-wrapper">
+  <span
+    *ngIf="text"
+    class="label"
+    [style.fontSize.px]="dynamicFontSize"
+  >
+    {{ text }}
+  </span>
+  <div
+    class="time-wrapper"
+    [style.fontSize.px]="dynamicFontSize"
+    [style.color]="color"
+  >
+    {{ formattedTime }}
+  </div>
+</div>

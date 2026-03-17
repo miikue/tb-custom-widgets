@@ -32,6 +32,32 @@ import {
   ExampleChartSettingsComponent
 } from './example-chart/chart-settings/example-chart-settings.component';
 
+
+
+// Miikue Components
+import { MiikueDialPretokComponent } from '../miikue-dial-pretok/miikue-dial-pretok.component';
+import { MiikueDialFveComponent } from '../miikue-dial-fve/miikue-dial-fve.component';
+import { MiikueRegulaceComponent } from '../miikue-regulace/miikue-regulace.component';
+import { MiikueLabelComponent } from '../miikue-label/miikue-label.component';
+import { MiikueValueComponent } from '../miikue-value/miikue-value.component';
+import { MiikueLedComponent } from '../miikue-led/miikue-led.component';
+import { MiikueSignalizationComponent } from '../miikue-signalization/miikue-signalization.component';
+import { MiikueLedListComponent } from '../miikue-led-list/miikue-led-list.component';
+import { MiikueEnergieComponent } from '../miikue-energie/miikue-energie.component';
+import { MiikueTimeFormatterComponent } from '../miikue-time-formatter/miikue-time-formatter.component';
+import { MiikueCommunicationComponent } from '../miikue-communication/miikue-communication.component';
+import { MiikueStavyComponent } from '../miikue-stavy/miikue-stavy.component';
+import { MiikueChartLineComponent } from '../miikue-chart-line/miikue-chart-line.component';
+import { MiikueTimeWindowSelectorComponent } from '../miikue-time-window-selector/miikue-time-window-selector.component';
+import { MiikueTimeInputComponent } from '../miikue-time-input/miikue-time-input.component';
+
+// Angular Material Modules for Date Picker
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
+
+
 @NgModule({
   declarations: [
     ExampleTableComponent,
@@ -43,7 +69,24 @@ import {
     ExampleTableCustomSubscriptionComponent,
     ExampleOfUsingThirdPartyLibraryComponent,
     ExampleChartComponent,
-    ExampleChartSettingsComponent
+    ExampleChartSettingsComponent,
+
+    // Miikue Components
+    MiikueDialPretokComponent,
+    MiikueDialFveComponent,
+    MiikueRegulaceComponent,
+    MiikueLabelComponent,
+    MiikueValueComponent,
+    MiikueLedComponent,
+    MiikueSignalizationComponent,
+    MiikueLedListComponent,
+    MiikueEnergieComponent,
+    MiikueTimeFormatterComponent,
+    MiikueCommunicationComponent,
+    MiikueStavyComponent,
+    MiikueChartLineComponent,
+    MiikueTimeWindowSelectorComponent,
+    MiikueTimeInputComponent
   ],
   imports: [
     CommonModule,
@@ -51,7 +94,13 @@ import {
     HomeComponentsModule,
     ChartModule,
     BasicWidgetConfigModule,
-    WidgetConfigComponentsModule
+    WidgetConfigComponentsModule,
+
+        // Material
+    MatDatepickerModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatNativeDateModule
   ],
   exports: [
     ExampleTableComponent,
@@ -63,7 +112,28 @@ import {
     ExampleTableCustomSubscriptionComponent,
     ExampleOfUsingThirdPartyLibraryComponent,
     ExampleChartComponent,
-    ExampleChartSettingsComponent
+    ExampleChartSettingsComponent,
+
+
+        // Miikue
+    MiikueDialPretokComponent,
+    MiikueDialFveComponent,
+    MiikueRegulaceComponent,
+    MiikueLabelComponent,
+    MiikueValueComponent,
+    MiikueLedComponent,
+    MiikueSignalizationComponent,
+    MiikueLedListComponent,
+    MiikueEnergieComponent,
+    MiikueTimeFormatterComponent,
+    MiikueCommunicationComponent,
+    MiikueStavyComponent,
+    MiikueChartLineComponent,
+    MiikueTimeWindowSelectorComponent,
+    MiikueTimeInputComponent
+  ],
+    providers: [
+    { provide: MAT_DATE_LOCALE, useValue: 'cs-CZ' }
   ]
 })
 

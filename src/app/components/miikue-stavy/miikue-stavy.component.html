@@ -1,0 +1,42 @@
+<div class="miikue-stavy-card" [class.is-fullscreen]="fullscreen">
+
+    <!-- SMALL MODE (Not Fullscreen) -->
+    <div *ngIf="!fullscreen" class="small-view">
+        <span class="small-label">{{ title }}</span>
+        <span class="status-indicator" 
+              [style.background-color]="summaryLedColor"
+              [style.box-shadow]="summaryLedColor === '#94a3b8' ? 'none' : ('0 0 6px ' + summaryLedColor)">
+        </span>
+    </div>
+
+    <!-- FULLSCREEN MODE -->
+    <div *ngIf="fullscreen && hasData" class="full-view">
+        <div class="view-header">
+            <span class="view-title">{{ title }}</span>
+        </div>
+        
+        <div class="items-list">
+            <!-- Unified template for all status items -->
+            <ng-container *ngFor="let item of allStatuses">
+                <div class="comm-item" *ngIf="item">
+                    <div class="item-header">
+                        <div class="item-title-group">
+                            <span class="item-name">{{ item.name }}</span>
+                            <span class="status-indicator"
+                                  [style.background-color]="item.color"
+                                  [style.box-shadow]="(item.color === '#94a3b8' || item.color === '#ef4444') ? 'none' : ('0 0 6px ' + item.color)">
+                            </span>
+                        </div>
+                        <span class="item-status-text" [style.color]="item.color">
+                            {{ item.valueText }}
+                        </span>
+                    </div>
+                    <div class="item-footer" *ngIf="item.ts > 0">
+                        {{ item.ts | date:'dd.MM.yyyy HH:mm:ss' }}
+                    </div>
+                </div>
+            </ng-container>
+        </div>
+    </div>
+
+</div>

@@ -1,0 +1,126 @@
+:host {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.miikue-communication-card {
+    width: 100%;
+    height: 100%;
+    background: white;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    container-type: size;
+}
+
+/* --- COMMON ELEMENTS --- */
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.status-indicator.active {
+    background-color: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+
+.status-indicator.inactive {
+    background-color: #ef4444;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+}
+
+/* --- SMALL VIEW (Compact) --- */
+.small-view {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 0 8px;
+    gap: 6px;
+}
+
+.small-label {
+    font-size: clamp(10px, 13cqi, 16px);
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.small-view .status-indicator {
+    width: clamp(10px, 13cqi, 16px);
+    height: clamp(10px, 13cqi, 16px);
+    flex-shrink: 0;
+}
+
+
+/* --- FULL VIEW (Detailed) --- */
+.full-view {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.view-header {
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 8px;
+}
+
+.view-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #1e293b;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.comm-item {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.item-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.item-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #475569;
+}
+
+.item-status-text {
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.item-footer {
+    font-size: 10px;
+    color: #94a3b8;
+    text-align: right;
+    font-weight: 600;
+}

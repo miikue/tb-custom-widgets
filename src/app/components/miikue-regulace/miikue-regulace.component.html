@@ -1,0 +1,17 @@
+<div class="widget-card">
+    <div class="v1-row">
+        <div>
+            <span class="label-small" [title]="psdLabel">{{ psdLabel }}</span>
+            <div class="val-primary" [style.color]="!isOk ? badColor : '#1e293b'">{{ psdOut }} <span style="font-size: 0.6em; font-weight: normal;">{{ psdUnit }}</span></div>
+        </div>
+        <div style="text-align: right;">
+            <span class="label-small">Stav regulace</span>
+            <div class="val-secondary" [style.color]="regStatusColor">{{ regStatusText }}</div>
+        </div>
+    </div>
+    <div class="v1-switch-container">
+        <div class="v1-opt" *ngFor="let opt of options" [ngClass]="getOptionClass(opt)">
+            <span>{{ opt.label }}</span>
+        </div>
+    </div>
+</div>

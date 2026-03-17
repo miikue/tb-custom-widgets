@@ -1,0 +1,183 @@
+// Using ::ng-deep allows us to style the mat-calendar which is rendered outside of this component's view,
+// bypassing Angular's view encapsulation. This is necessary for custom theming.
+
+:host {
+  display: inline-block;
+  font-family: 'Roboto', sans-serif;
+}
+.calendar-container{
+  width: 300px;
+}
+
+.time-window-selector .display-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  &:hover {
+    background-color: #f5f5f5;
+    border-color: #bbb;
+  }
+  svg {
+    width: 16px;
+    height: 16px;
+    fill: #555;
+  }
+}
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 1040;
+}
+
+.popup-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  z-index: 1041;
+  
+  .popup-content {
+    display: flex;
+  }
+
+  .quick-selections {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-right: 1px solid #eee;
+    padding: 20px;
+    background-color: #f8f9fa;
+    max-height: 350px; // Max height to enable vertical scroll
+    overflow-y: auto; // Enable vertical scroll
+
+    /* Hide scrollbar for cleaner look */
+    &::-webkit-scrollbar { display: none; }
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+
+    h4 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    button {
+      text-align: left;
+      padding: 8px 14px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      white-space: nowrap;
+      &:hover {
+        background-color: #e9ecef;
+      }
+    }
+  }
+
+  .custom-selection {
+    display: flex;
+    gap: 24px;
+    padding: 20px;
+
+    .time-and-actions {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 20px;
+      width: 140px;
+      padding-top: 10px;
+
+      .form-group.time-inputs {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        
+        .input-group {
+            display: flex;
+            justify-content: center;
+        }
+      }
+
+      .actions {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: auto;
+        padding-top: 16px;
+        border-top: 1px solid #eee;
+        
+        button {
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 14px;
+          border: 1px solid transparent;
+          text-align: center;
+
+          &.apply-btn {
+            background-color: #3f51b5;
+            color: white;
+            &:hover { background-color: #344495; }
+          }
+        }
+      }
+    }
+  }
+}
+
+// --- Global styles for mat-calendar ---
+::ng-deep {
+  .mat-calendar-body-cell-content {
+    border-radius: 4px !important;
+  }
+  
+  .mat-calendar-body-in-range::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    left: 0;
+    right: 0;
+    background: #eef2ff;
+    z-index: -1;
+  }
+
+  .mat-calendar-body-range-start::before, .mat-calendar-body-range-end::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    background: #eef2ff;
+    z-index: -1;
+  }
+  .mat-calendar-body-range-start::before {
+    left: 50%;
+    right: 0;
+  }
+  .mat-calendar-body-range-end::before {
+    left: 0;
+    right: 50%;
+  }
+
+  .mat-calendar-body-selected {
+    background-color: #3f51b5;
+    color: white;
+  }
+}

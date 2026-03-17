@@ -1,0 +1,114 @@
+<div class="widget-card">
+    
+    <!-- Fullscreen Controls -->
+    <div class="fullscreen-controls" *ngIf="fullscreen">
+        <div class="control-row">
+            <app-miikue-time-window-selector
+                [initialTimeWindow]="currentTimeWindow"
+                (timeWindowChange)="onTimeWindowChange($event)"
+                [showTimeSelection]="true"
+                [showQuickSelections]="true">
+            </app-miikue-time-window-selector>
+        </div>
+        
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-item">
+                <span class="stat-label">Min</span>
+                <span class="stat-value">{{ stats.min }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Max</span>
+                <span class="stat-value">{{ stats.max }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Průměr</span>
+                <span class="stat-value">{{ stats.avg }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Celkem</span>
+                <span class="stat-value">{{ stats.total }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Layer -->
+    <div class="content-layer">
+        <!-- Daily Production (Big) -->
+        <div class="daily-section">
+            <div class="label-sub">{{ dailyLabel }}</div>
+            <div class="val-primary" [style.color]="currentPrimaryColor">
+                {{ _dailyVal }} <span class="unit-primary">{{ _dailyUnit }}</span>
+            </div>
+        </div>
+
+        <!-- Total Production (Same line) -->
+        <div class="total-section">
+            <span class="label-total">{{ totalLabel }}:</span>
+            <span class="val-secondary" [style.color]="!isOk ? badColor : '#475569'">
+                {{ _totalVal }} <span class="unit-secondary">{{ _totalUnit }}</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Background Chart Layer (Dynamic) -->
+    <div class="chart-layer" 
+         (touchstart)="onChartTouchStart($event)"
+         (touchmove)="onChartTouchMove($event)"
+         (touchend)="onBarLeave()">
+        <!-- Non-deformed Month Labels -->
+        <div class="month-labels">
+            <div *ngFor="let marker of monthMarkers" 
+                 class="month-label-item"
+                 [style.left.%]="marker.x">
+                {{ marker.label }}
+            </div>
+        </div>
+
+        <!-- Grid Labels (Only in Fullscreen/Large mode) -->
+        <div class="grid-labels" *ngIf="fullscreen">
+            <div *ngFor="let grid of gridLines" 
+                 class="grid-label-item"
+                 [style.top.%]="(grid.y / 40) * 100">
+                {{ grid.value }}
+            </div>
+        </div>
+
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="chart-svg">
+            <!-- Grid Lines (Only in Fullscreen/Large mode) -->
+            <ng-container *ngFor="let grid of gridLines">
+                <line *ngIf="fullscreen" x1="0" [attr.y1]="grid.y" x2="100" [attr.y2]="grid.y" class="grid-line" />
+            </ng-container>
+
+            <!-- Month Markers (Lines stay in SVG, they can be stretched) -->
+            <ng-container *ngFor="let marker of monthMarkers">
+                <line [attr.x1]="marker.x" y1="0" [attr.x2]="marker.x" y2="40" class="month-line" />
+            </ng-container>
+
+            <!-- X-Axis Line -->
+            <line x1="0" y1="40" x2="100" y2="40" class="chart-axis" />
+            
+            <rect *ngFor="let bar of chartBars"
+                  [attr.x]="bar.x"
+                  [attr.y]="bar.y"
+                  [attr.width]="bar.width"
+                  [attr.height]="bar.height"
+                  rx="0.5"
+                  [ngClass]="bar.isLast ? 'bar-active' : 'bar-placeholder'"
+                  (mouseenter)="onBarEnter(bar, $event)"
+                  (mousemove)="onBarMove($event)"
+                  (mouseleave)="onBarLeave()">
+            </rect>
+        </svg>
+    </div>
+
+    <!-- Custom Prettier Tooltip -->
+    <div class="custom-tooltip" 
+         *ngIf="hoveredBar" 
+         [style.left.%]="hoveredBar.x + (hoveredBar.width / 2)" 
+         [style.bottom.%]="(40 - hoveredBar.y) + 5">
+        <div class="tooltip-date">{{ hoveredBar.date }}</div>
+        <div class="tooltip-value">{{ hoveredBar.value }}</div>
+    </div>
+
+</div>

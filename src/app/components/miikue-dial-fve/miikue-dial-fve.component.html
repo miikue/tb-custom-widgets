@@ -1,0 +1,80 @@
+<div class="widget-card">
+  <div class="gauge-container">
+      <svg viewBox="0 -15 200 160" preserveAspectRatio="xMidYMid meet" class="gauge-svg">
+          <!-- Background Track (Semi-circle from 180deg to 360deg) -->
+          <path d="M 20 100 A 80 80 0 0 1 180 100" class="bg-arc" />
+
+          <!-- Active Arc (Production) -->
+          <path d="M 20 100 A 80 80 0 0 1 180 100" 
+                class="active-arc"
+                stroke-dasharray="251" 
+                [style.stroke]="productionColor"
+                [style.stroke-dashoffset]="activeOffset" />
+          
+          <!-- Limit Zone (Red Stripe for Restricted Area) -->
+          <!-- Drawn ON TOP of the active arc. Shows red stripe from limit to 100%. -->
+          <path d="M 20 100 A 80 80 0 0 1 180 100" 
+                class="limit-zone"
+                stroke-dashoffset="0"
+                [style.stroke-dasharray]="limitRedDashArray"
+                [style.stroke]="limitColor"
+                *ngIf="isLimitVisible" />
+
+          <!-- Generated Ticks and Labels (Main Values) -->
+          <ng-container *ngFor="let tick of ticks">
+            <line [attr.x1]="tick.line.x1" [attr.y1]="tick.line.y1" 
+                  [attr.x2]="tick.line.x2" [attr.y2]="tick.line.y2" 
+                  class="center-zero-mark" />
+            
+            <text [attr.x]="tick.label.x" [attr.y]="tick.label.y" 
+                  [style.text-anchor]="tick.label.anchor"
+                  class="scale-label">{{ tick.label.text }}</text>
+          </ng-container>
+
+          <!-- Generated Limit Ticks (Inner Percentages) -->
+          <ng-container *ngFor="let tick of limitTicks">
+            <line [attr.x1]="tick.line.x1" [attr.y1]="tick.line.y1" 
+                  [attr.x2]="tick.line.x2" [attr.y2]="tick.line.y2" 
+                  class="center-zero-mark" 
+                  [style.stroke]="tick.pct === currentLimitPct ? limitColor : '#94a3b8'" />
+            
+            <text [attr.x]="tick.label.x" [attr.y]="tick.label.y" 
+                  [style.text-anchor]="tick.label.anchor"
+                  [style.fill]="tick.pct === currentLimitPct ? limitColor : '#94a3b8'"
+                  [style.font-weight]="tick.pct === currentLimitPct ? '900' : '700'"
+                  class="scale-label">{{ tick.label.text }}</text>
+          </ng-container>
+
+          <!-- Limit Marker Line (Overlays the active arc) -->
+          <line x1="12" y1="100" x2="28" y2="100" 
+                class="limit-line"
+                stroke-width="2" 
+                [style.stroke]="limitColor" 
+                *ngIf="isLimitVisible" 
+                [style.transform]="'rotate(' + (limitAngle - 180) + 'deg)'" />
+
+          <!-- Text Labels inside SVG for Perfect Scaling -->
+          <!-- Primary Value (P) -->
+          <text x="100" y="78" text-anchor="middle" class="svg-val-p" 
+                [style.fill]="!isOk ? badColor : productionColor">
+              {{ !isOk ? '' : '' }}{{ displayValue }} <tspan class="svg-unit" font-size="0.6em" dy="0">{{ _unit }}</tspan>
+          </text>
+
+          <!-- Secondary Value (Q) -->
+          <text x="100" y="98" text-anchor="middle" class="svg-val-q" 
+                [style.fill]="!isOk ? badColor : '#64748b'">
+              Q: {{ displayQValue }} {{ _qUnit }}
+          </text>
+
+          <!-- Status Footer Background -->
+          <rect x="0" y="118" width="200" height="25" rx="0"
+                [style.fill]="!isOk || isLimitUnknown ? '#f3f4f6' : (isLimitVisible && currentLimitPct < 100 ? '#fefce8' : '#dcfce7')" /> 
+
+          <!-- Status Text -->
+          <text x="100" y="135" text-anchor="middle" class="svg-status" 
+                [style.fill]="!isOk || isLimitUnknown ? badColor : (isLimitVisible && currentLimitPct < 100 ? '#854d0e' : '#15803d')">
+              {{ statusText }}
+          </text>
+      </svg>
+  </div>
+</div>

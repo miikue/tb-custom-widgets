@@ -1,0 +1,26 @@
+<div class="list-container">
+  <!-- Title Row -->
+  <div
+    *ngIf="text && text.trim().length > 0"
+    class="title"
+    [style.fontSize.px]="dynamicTitleSize"
+  >
+    {{ text }}
+  </div>
+
+  <!-- LEDs Row -->
+  <div class="led-row">
+    <div
+      *ngFor="let led of ledList"
+      class="led-item"
+    >
+      <tb-miikue-led [size]="dynamicLedSize" [color]="led.color"></tb-miikue-led>
+      <span
+        class="led-label"
+        [style.fontSize.px]="dynamicLedLabelSize"
+      >
+        {{ led.label }}
+      </span>
+    </div>
+  </div>
+</div>

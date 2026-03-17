@@ -1,0 +1,24 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.signalization-wrapper {
+  display: flex;
+  align-items: center; // Vertically center the label and the LED
+  justify-content: center; // Horizontally center the whole block
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 5px;
+  box-sizing: border-box;
+  overflow: hidden; // Hide anything that might overflow
+}
+
+.label {
+  white-space: nowrap; // Prevent text from wrapping
+  text-overflow: ellipsis; // Add '...' if text is too long
+  overflow: hidden;
+  color: black; // Match value component's label color
+}

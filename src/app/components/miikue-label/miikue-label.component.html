@@ -1,0 +1,9 @@
+
+  <div [style.height.px]="top"></div>
+  <div class="label-wrapper" [ngStyle]="{
+    'fontSize.px': dynamicFontSize,
+    'fontWeight': dynamicFontWeight
+  }">
+    {{ text }}
+  </div>
+  <div [style.height.px]="bottom"></div>
