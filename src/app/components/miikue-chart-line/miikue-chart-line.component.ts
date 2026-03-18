@@ -7,14 +7,12 @@ import {
   Renderer2,
   SecurityContext,
   TemplateRef,
-  ViewChild,
-  OnDestroy,
-  NgZone
+  ViewChild
 } from '@angular/core';
 import * as echarts from 'echarts/core';
 import { EChartsOption, SeriesOption } from 'echarts';
 import { WidgetContext } from '@home/models/widget-component.models';
-import { LineChart, BarChart, PieChart, RadarChart, CustomChart } from 'echarts/charts';
+import { BarChart, CustomChart, LineChart, PieChart, RadarChart } from 'echarts/charts';
 import {
   DataZoomComponent,
   GridComponent,
@@ -33,18 +31,13 @@ import { DomSanitizer } from '@angular/platform-browser';
 import { isDefinedAndNotNull } from '@core/public-api';
 import { calculateAxisSize, measureAxisNameSize } from '@home/components/public-api';
 import { ECharts } from '@home/components/widget/lib/chart/echarts-widget.models';
-import { Subscription, from, of, Subject } from 'rxjs';
-import { catchError, concatMap, map, tap, finalize, takeUntil } from 'rxjs/operators';
-import { HttpParams } from '@angular/common/http';
 
 @Component({
   selector: 'tb-miikue-chart-line',
   templateUrl: './miikue-chart-line.component.html',
   styleUrls: ['./miikue-chart-line.component.scss']
 })
-export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestroy {
-
-  private readonly fallbackSuffixOrder = ['', '_min', '_30min', '_hour'];
+export class MiikueChartLineComponent implements OnInit, AfterViewInit {
 
   private _echartContainer: ElementRef<HTMLElement>;
   @ViewChild('echartContainer', {static: false}) set echartContainer(container: ElementRef<HTMLElement>) {
@@ -55,6 +48,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   @Input() ctx: WidgetContext;
+
+
   @Input() showSmallGraph: boolean = true;
   @Input() fullscreen: boolean = false;
   @Input() maxSplitTime: number = 0;
@@ -65,6 +60,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   private xAxis: XAXisOption;
   private yAxis: YAXisOption;
   private option: EChartsOption;
+
   private valueFormatter: ValueFormatProcessor;
 
   public legendConfig: LegendConfig;
@@ -72,17 +68,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   public legendData: LegendData;
   public legendKeys: Array<LegendKey>;
   public showLegend: boolean;
-
-  // --- Smart Loading State ---
-  private destroy$ = new Subject<void>();
-  private loadSubscription: Subscription;
-  
-  // Cache: Ukládáme data a informaci o tom, jaký rozsah máme v paměti
-  private store = {
-    minLoaded: -1,
-    maxLoaded: -1,
-    series: {} as { [key: number]: { data: [number, number][] } }
-  };
 
   public get shouldRender(): boolean {
     return this.showSmallGraph || this.fullscreen;
@@ -92,357 +77,162 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     private renderer: Renderer2,
     private sanitizer: DomSanitizer,
     public widgetComponent: WidgetComponent,
-    private ngZone: NgZone
   ) {}
 
+  //Core logic
   ngOnInit(): void {
     this.ctx.$scope.miikueChartLineWidget = this;
     this.prepareValueFormat();
-    
-    // Inicializace prázdného store pro každou sérii
-    if (this.ctx.datasources.length > 0) {
-      this.ctx.datasources[0].dataKeys.forEach((_, idx) => {
-        this.store.series[idx] = { data: [] };
-      });
-    }
-
-    this.initEchart(); // Registrace modulů
+    this.initEchart();
     this.initLegend();
   }
 
   ngAfterViewInit(): void {
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-    if (this.loadSubscription) this.loadSubscription.unsubscribe();
-    if (this.shapeResize$) this.shapeResize$.disconnect();
-    if (this.myChart) {
-      this.myChart.dispose();
-    }
-  }
-
-  public onDataUpdated() {
-    if (!this.myChart || !this.shouldRender) return;
-    this.checkAndFetchData();
-  }
-
   private initChart(): void {
-    if (this.myChart) return;
-
-    // Inicializace ECharts mimo Angular zónu pro výkon
-    this.ngZone.runOutsideAngular(() => {
-      this.myChart = echarts.init(this._echartContainer.nativeElement, null, { renderer: 'canvas' });
+    this.myChart = echarts.init(this._echartContainer.nativeElement,  null, {
+      renderer: 'canvas'
     });
-
     this.initResize();
+
     this.xAxis = this.setupXAxis();
     this.yAxis = this.setupYAxis();
-
     this.option = {
       ...this.setupAnimationSettings(),
       formatter: (params: CallbackDataParams[]) => this.setupTooltipElement(params),
       backgroundColor: "transparent",
       darkMode: false,
       tooltip: {
-        show: true, trigger: 'axis', confine: true, padding: [8, 12], appendTo: 'body',
-        textStyle: { fontFamily: 'Roboto', fontSize: 12, fontWeight: 'normal', lineHeight: 16 }
+        show: true,
+        trigger: 'axis',
+        confine: true,
+        padding: [8, 12],
+        appendTo: 'body',
+        textStyle: {
+          fontFamily: 'Roboto',
+          fontSize: 12,
+          fontWeight: 'normal',
+          lineHeight: 16
+        }
       },
       grid: [{
-        backgroundColor: null, borderColor: "#ccc", borderWidth: 1,
-        bottom: 45, left: 5, right: 5, show: false, top: 10
+        backgroundColor: null,
+        borderColor: "#ccc",
+        borderWidth: 1,
+        bottom: 45,
+        left: 5,
+        right: 5,
+        show: false,
+        top: 10
       }],
       xAxis: [this.xAxis],
       yAxis: [this.yAxis],
       series: this.setupChartLines(),
       dataZoom: [
-        { type: 'inside', disabled: false, realtime: true, filterMode: 'filter' },
-        { type: 'slider', show: true, showDetail: false, realtime: true, filterMode: 'filter', bottom: 5 }
+        {
+          type: 'inside',
+          disabled: false,
+          realtime: true,
+          filterMode:  'filter'
+        },
+        {
+          type: 'slider',
+          show: true,
+          showDetail: false,
+          realtime: true,
+          filterMode: 'filter',
+          bottom: 5
+        }
       ]
-    };
+    }
 
-    this.ngZone.runOutsideAngular(() => {
-      this.myChart.setOption(this.option);
-    });
-    
+    this.myChart.setOption(this.option);
     this.updateAxisOffset(false);
-    this.checkAndFetchData();
   }
 
-  // =================================================================================
-  // SMART DATA LOADING LOGIC
-  // =================================================================================
-
-  private checkAndFetchData() {
-    const requestedWindow = this.ctx.defaultSubscription.timeWindow;
-    const reqMin = requestedWindow.minTime;
-    const reqMax = requestedWindow.maxTime;
-
-    // 1. Aktualizace pohledu osy X (zoom)
-    this.updateXAxisView(reqMin, reqMax);
-
-    // 2. Výpočet chybějících dat
-    const missingRanges = this.calculateMissingRanges(reqMin, reqMax);
-
-    if (missingRanges.length === 0) {
-      return; // Data máme v cache
+  public onDataUpdated() {
+    if (!this.myChart || !this.shouldRender) {
+      return;
     }
+    const newData = {};
+    this.onResize();
+    this.updateXAxisTimeWindow(this.xAxis, this.ctx.defaultSubscription.timeWindow);
 
-    // Pokud se rozsahy nepotkávají, vyčistit cache
-    const isDisjoint = (reqMax < this.store.minLoaded) || (reqMin > this.store.maxLoaded);
-    if (this.store.minLoaded !== -1 && isDisjoint) {
-       this.clearStore();
-    }
+    for (const key in this.ctx.data) {
+      const dataKey = this.ctx.data[key].dataKey;
+      const decimals = isDefinedAndNotNull(dataKey.decimals) ? dataKey.decimals : this.ctx.decimals;
+      const factor = Math.pow(10, decimals);
 
-    // 3. Stažení dat
-    this.fetchMissingRanges(missingRanges, reqMin, reqMax);
-  }
-
-  private calculateMissingRanges(reqMin: number, reqMax: number): {start: number, end: number}[] {
-    if (this.store.minLoaded === -1) {
-      return [{ start: reqMin, end: reqMax }];
-    }
-    const ranges = [];
-    if (reqMin < this.store.minLoaded) {
-      ranges.push({ start: reqMin, end: this.store.minLoaded });
-    }
-    if (reqMax > this.store.maxLoaded) {
-      ranges.push({ start: this.store.maxLoaded, end: reqMax });
-    }
-    return ranges;
-  }
-
-  private fetchMissingRanges(ranges: {start: number, end: number}[], globalMin: number, globalMax: number) {
-    if (this.loadSubscription) this.loadSubscription.unsubscribe();
-
-    const requestStream = from(ranges).pipe(
-      concatMap(range => {
-        // Chunk size 120 minut
-        const CHUNK_SIZE = 120 * 60 * 1000;
-        const chunks = [];
-        for (let t = range.start; t < range.end; t += CHUNK_SIZE) {
-          chunks.push({
-            start: t,
-            end: Math.min(t + CHUNK_SIZE, range.end)
-          });
-        }
-        return from(chunks);
-      }),
-      concatMap(chunk => {
-        // Limit 50000 bodů, RAW data
-        return this.fetchDataFromApi(chunk.start, chunk.end, 0, 'NONE', 50000).pipe(
-           tap(data => {
-             this.ngZone.runOutsideAngular(() => {
-               this.mergeDataToStore(data, chunk.start, chunk.end);
-             });
-           })
-        );
-      }),
-      finalize(() => {
-        // Aktualizace globálního rozsahu cache
-        if (this.store.minLoaded === -1) {
-            this.store.minLoaded = globalMin;
-            this.store.maxLoaded = globalMax;
-        } else {
-            this.store.minLoaded = Math.min(this.store.minLoaded, globalMin);
-            this.store.maxLoaded = Math.max(this.store.maxLoaded, globalMax);
-        }
-        this.myChart.hideLoading();
-      }),
-      takeUntil(this.destroy$)
-    );
-
-    this.myChart.showLoading({ maskColor: 'rgba(255,255,255,0.2)' });
-    this.loadSubscription = requestStream.subscribe();
-  }
-
-  private fetchDataFromApi(startTs: number, endTs: number, interval: number, agg: string, limit: number) {
-    const datasource = this.ctx.datasources[0];
-    if (!datasource.dataKeys || datasource.dataKeys.length === 0) return of({});
-
-    const fallbackChains = datasource.dataKeys.map(k => this.getFallbackKeyChain(k.name));
-    const requestedKeys = Array.from(new Set(fallbackChains.flat()));
-    const keysParam = requestedKeys.join(',');
-
-    let params = new HttpParams()
-      .set('keys', keysParam)
-      .set('startTs', Math.floor(startTs).toString())
-      .set('endTs', Math.floor(endTs).toString());
-
-    if (agg === 'NONE') {
-      params = params.set('limit', limit.toString());
-    } else {
-      params = params.set('interval', Math.floor(interval).toString()).set('agg', agg).set('limit', limit.toString());
-    }
-    
-    const url = `/api/plugins/telemetry/${datasource.entityType}/${datasource.entityId}/values/timeseries`;
-
-    return this.ctx.http.get(url, { params }).pipe(
-      map((res: any) => {
-        const result = {};
-        datasource.dataKeys.forEach((_, index) => {
-          result[index] = this.composeSeriesFromFallbackKeys(res, fallbackChains[index]);
-        });
-        return result;
-      }),
-      catchError(err => {
-        console.error('Fetch error:', err);
-        return of({});
-      })
-    );
-  }
-
-  private getFallbackKeyChain(originalKey: string): string[] {
-    const matchedSuffix = this.fallbackSuffixOrder
-      .filter(suffix => suffix.length > 0)
-      .find(suffix => originalKey.endsWith(suffix));
-
-    if (matchedSuffix) {
-      const baseKey = originalKey.slice(0, originalKey.length - matchedSuffix.length);
-      const startIndex = this.fallbackSuffixOrder.indexOf(matchedSuffix);
-      return this.fallbackSuffixOrder.slice(startIndex).map(suffix => `${baseKey}${suffix}`);
-    }
-
-    return [
-      originalKey,
-      ...this.fallbackSuffixOrder
-        .filter(suffix => suffix.length > 0)
-        .map(suffix => `${originalKey}${suffix}`)
-    ];
-  }
-
-  private composeSeriesFromFallbackKeys(response: any, keyChain: string[]): [number, number][] {
-    const merged: [number, number][] = [];
-    let oldestTimestamp = Number.POSITIVE_INFINITY;
-
-    for (const keyName of keyChain) {
-      const points = this.parseTelemetryPoints(response?.[keyName]);
-      if (!points.length) {
-        continue;
-      }
-
-      if (!merged.length) {
-        merged.push(...points);
-        oldestTimestamp = points[0][0];
-        continue;
-      }
-
-      const olderOnly = points.filter(point => point[0] < oldestTimestamp);
-      if (olderOnly.length) {
-        merged.unshift(...olderOnly);
-        oldestTimestamp = olderOnly[0][0];
-      }
-    }
-
-    return merged;
-  }
-
-  private parseTelemetryPoints(series: any): [number, number][] {
-    if (!Array.isArray(series) || series.length === 0) {
-      return [];
-    }
-
-    return series
-      .map(point => [Number(point.ts), Number(point.value)] as [number, number])
-      .filter(point => Number.isFinite(point[0]) && Number.isFinite(point[1]))
-      .sort((a, b) => a[0] - b[0]);
-  }
-
-  private mergeDataToStore(newData: any, chunkStart: number, chunkEnd: number) {
-    let hasUpdates = false;
-    Object.keys(newData).forEach(key => {
-      const idx = Number(key);
-      const newPoints = newData[idx];
-      if (!newPoints || newPoints.length === 0) return;
-
-      const storeSeries = this.store.series[idx];
+      newData[key] = [];
+      let lastTs = 0;
       
-      // Optimalizace připojování dat
-      if (storeSeries.data.length > 0 && newPoints[0][0] >= storeSeries.data[storeSeries.data.length - 1][0]) {
-          storeSeries.data.push(...newPoints); // Append
-      } else if (storeSeries.data.length > 0 && newPoints[newPoints.length - 1][0] <= storeSeries.data[0][0]) {
-          storeSeries.data.unshift(...newPoints); // Prepend
-      } else {
-         const filtered = storeSeries.data.filter(p => p[0] < chunkStart || p[0] >= chunkEnd);
-         storeSeries.data = filtered.concat(newPoints).sort((a, b) => a[0] - b[0]);
+      // Ensure data is sorted by timestamp, as ThingsBoard doesn't guarantee order
+      const sortedData = this.ctx.data[key].data.sort((a, b) => a[0] - b[0]);
+
+      for (const [ts, value] of sortedData) {
+        // Check for a gap if maxSplitTime is set and this is not the first point
+        if (this.maxSplitTime > 0 && lastTs > 0 && (ts - lastTs > this.maxSplitTime)) {          // Insert a null point to create a break in the line
+          newData[key].push({
+            name: ts - 100, // Placeholder timestamp
+            value: [ts-10, null]
+          });
+        }
+        
+        // Add the actual data point
+        newData[key].push({
+          name: ts,
+          value: [
+            ts,
+            Math.trunc(Number(value) * factor) / factor
+          ]
+        });
+        lastTs = ts;
       }
-      hasUpdates = true;
+    }
+
+    const currentSeries = Array.isArray(this.option.series) ? this.option.series : [this.option.series];
+    const newSeries = [];
+    for (const series of currentSeries) {
+        const data = newData[series.id];
+        if(data) {
+          newSeries.push({...series, data});
+        } else {
+          newSeries.push(series);
+        }
+    }
+    this.option.series = newSeries;
+    
+    this.myChart.setOption({
+      xAxis: this.xAxis,
+      series: newSeries
     });
 
-    if (hasUpdates) {
-      requestAnimationFrame(() => {
-        this.refreshChartSeries();
-      });
+    this.updateAxisOffset();
+  }
+
+  //Support logic
+  private updateAxisOffset(lazy = true): void {
+    const leftOffset = calculateAxisSize(this.myChart, this.yAxis.mainType,  this.yAxis.id as string);
+    const leftNameSize = measureAxisNameSize(this.myChart, this.yAxis.mainType, this.yAxis.id as string, this.yAxis.name);
+    const bottomOffset = calculateAxisSize(this.myChart, this.xAxis.mainType,  this.xAxis.id as string);
+    const bottomNameSize = measureAxisNameSize(this.myChart, this.yAxis.mainType, this.yAxis.id as string, this.yAxis.name);
+    const newGridLeft = leftOffset + leftNameSize;
+    const newGridBottom = bottomOffset + bottomNameSize + 35;
+    if (this.option.grid[0].left !== newGridLeft || this.option.grid[0].bottom !== newGridBottom) {
+      this.option.grid[0].left = newGridLeft;
+      this.yAxis.nameGap = leftOffset;
+      this.option.grid[0].bottom = newGridBottom;
+      this.xAxis.nameGap = bottomOffset;
+      this.myChart.setOption(this.option, {replaceMerge: ['yAxis', 'xAxis', 'grid'], lazyUpdate: lazy});
     }
   }
 
-  private refreshChartSeries() {
-    const newSeries = [];
-    const currentOptions = this.option.series as SeriesOption[];
-    
-    currentOptions.forEach((opt: any) => {
-      const idx = opt.id;
-      const rawData = this.store.series[idx]?.data || [];
-      const processedData = this.applyGapsAndFormat(rawData, idx);
-      newSeries.push({ ...opt, data: processedData });
-    });
-
-    this.myChart.setOption({ series: newSeries }, { replaceMerge: ['series'] });
-  }
-
-  private applyGapsAndFormat(rawData: [number, number][], seriesIdx: number): any[] {
-     if (rawData.length === 0) return [];
-     
-     const processed = [];
-     const dataKey = this.ctx.datasources[0].dataKeys[seriesIdx];
-     const decimals = isDefinedAndNotNull(dataKey.decimals) ? dataKey.decimals : this.ctx.decimals;
-     const factor = Math.pow(10, decimals);
-     const needsFormat = decimals !== null; 
-
-     let lastTs = rawData[0][0];
-     let val = rawData[0][1];
-     if (needsFormat && val !== null) val = Math.round(val * factor) / factor;
-     
-     processed.push({ name: lastTs, value: [lastTs, val] });
-
-     for (let i = 1; i < rawData.length; i++) {
-        const currTs = rawData[i][0];
-        let currVal = rawData[i][1];
-        
-        if (this.maxSplitTime > 0 && (currTs - lastTs > this.maxSplitTime)) {
-            processed.push({ name: currTs - 1, value: [currTs - 1, null] });
-        }
-        
-        if (needsFormat && currVal !== null) {
-            currVal = Math.round(currVal * factor) / factor;
-        }
-
-        processed.push({ name: currTs, value: [currTs, currVal] });
-        lastTs = currTs;
-     }
-     return processed;
-  }
-
-  private clearStore() {
-    this.store.minLoaded = -1;
-    this.store.maxLoaded = -1;
-    Object.keys(this.store.series).forEach(k => this.store.series[k].data = []);
-  }
-
-  private updateXAxisView(min: number, max: number) {
-     this.ngZone.runOutsideAngular(() => {
-        if (this.myChart) {
-          this.myChart.setOption({
-              xAxis: { min: min, max: max }
-          });
-        }
-     });
-  }
-
-  // =================================================================================
-  // SUPPORT LOGIC
-  // =================================================================================
+  private updateXAxisTimeWindow = (option: XAXisOption,
+                                   timeWindow: WidgetTimewindow) => {
+    option.min = timeWindow.minTime;
+    option.max = timeWindow.maxTime;
+  };
 
   private initEchart(): void {
     echarts.use([
@@ -464,23 +254,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     ]);
   }
 
-  private updateAxisOffset(lazy = true): void {
-    const leftOffset = calculateAxisSize(this.myChart, this.yAxis.mainType,  this.yAxis.id as string);
-    const leftNameSize = measureAxisNameSize(this.myChart, this.yAxis.mainType, this.yAxis.id as string, this.yAxis.name);
-    const bottomOffset = calculateAxisSize(this.myChart, this.xAxis.mainType,  this.xAxis.id as string);
-    const bottomNameSize = measureAxisNameSize(this.myChart, this.yAxis.mainType, this.yAxis.id as string, this.yAxis.name);
-    const newGridLeft = leftOffset + leftNameSize;
-    const newGridBottom = bottomOffset + bottomNameSize + 35;
-    
-    if (this.option.grid[0].left !== newGridLeft || this.option.grid[0].bottom !== newGridBottom) {
-      this.option.grid[0].left = newGridLeft;
-      this.yAxis.nameGap = leftOffset;
-      this.option.grid[0].bottom = newGridBottom;
-      this.xAxis.nameGap = bottomOffset;
-      this.myChart.setOption(this.option, {replaceMerge: ['yAxis', 'xAxis', 'grid'], lazyUpdate: lazy});
-    }
-  }
-
   private initLegend(): void {
     this.showLegend = this.ctx.settings.showLegend;
     if (this.showLegend) {
@@ -498,11 +271,15 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
 
   private initResize(): void {
     this.shapeResize$ = new ResizeObserver(() => {
-      this.ngZone.runOutsideAngular(() => {
-        if (this.myChart) this.myChart.resize();
-      });
+      this.onResize();
     });
     this.shapeResize$.observe(this._echartContainer.nativeElement);
+  }
+
+private onResize() {
+    if (this.myChart) {
+      this.myChart.resize();
+    }
   }
 
   private prepareValueFormat() {
@@ -510,8 +287,10 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     this.valueFormatter = ValueFormatProcessor.fromSettings(this.ctx.$injector, {units, decimals: this.ctx.decimals});
   }
 
-  private setupTooltipElement(params: CallbackDataParams[]): HTMLElement {
+private setupTooltipElement(params: CallbackDataParams[]): HTMLElement {
     if (!params || params.length === 0) return null;
+
+    // 1. Získáme čas z bodu, na kterém je kurzor (snapnutý bod)
     const hoverTimestamp = params[0].value[0] as number;
 
     const tooltipElement: HTMLElement = this.renderer.createElement('div');
@@ -520,41 +299,51 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     this.renderer.setStyle(tooltipElement, 'align-items', 'flex-start');
     this.renderer.setStyle(tooltipElement, 'gap', '16px');
 
+    // Hlavička s datem
     const tooltipItemsElement: HTMLElement = this.renderer.createElement('div');
     this.renderer.setStyle(tooltipItemsElement, 'display', 'flex');
     this.renderer.setStyle(tooltipItemsElement, 'flex-direction', 'column');
     this.renderer.setStyle(tooltipItemsElement, 'align-items', 'flex-start');
     this.renderer.setStyle(tooltipItemsElement, 'gap', '4px');
 
+    // Použijeme hoverTimestamp pro zobrazení data
     const dateElement: HTMLElement = this.renderer.createElement('div');
     this.renderer.appendChild(dateElement, this.renderer.createText(new Date(hoverTimestamp).toLocaleString('en-GB')));
     this.renderer.setStyle(dateElement, 'font-family', 'Roboto');
     this.renderer.setStyle(dateElement, 'font-size', '11px');
+    this.renderer.setStyle(dateElement, 'font-style', 'normal');
+    this.renderer.setStyle(dateElement, 'font-weight', '400');
+    this.renderer.setStyle(dateElement, 'line-height', '16px');
     this.renderer.setStyle(dateElement, 'color', 'rgba(0, 0, 0, 0.76)');
+    
     this.renderer.appendChild(tooltipItemsElement, dateElement);
 
-    const sortedDataKeys = this.ctx.datasources[0].dataKeys.map((dk, idx) => ({dk, idx})).sort((a, b) => {
-       return a.dk.label.localeCompare(b.dk.label);
+
+    // 2. Iterujeme přes VŠECHNY datové zdroje (ne jen přes params)
+    // Seřadíme je podle klíče/legendy, aby se pořadí neměnilo
+    const sortedDataKeys = Object.values(this.ctx.data).sort((a: any, b: any) => {
+       return a.dataKey.label.localeCompare(b.dataKey.label);
     });
 
-    for (const item of sortedDataKeys) {
-      const idx = item.idx;
-      const dataKey = item.dk;
-      
-      const seriesStore = this.store.series[idx];
-      if (!seriesStore || !seriesStore.data.length) continue;
+    for (const item of sortedDataKeys as any[]) {
+      const dataKey = item.dataKey;
+      const data = item.data; // Raw data pole
 
-      const closestPoint = this.findClosestPoint(seriesStore.data, hoverTimestamp);
+      // 3. Najdeme nejbližší bod v této sérii pro aktuální čas
+      const closestPoint = this.findClosestPoint(data, hoverTimestamp);
       
       if (closestPoint) {
+        // Vytvoříme falešný "param" objekt, abychom mohli recyklovat vaši metodu constructTooltipSeriesElement
+        // nebo si vytvoříme řádek přímo zde (čistší řešení níže)
+        
         const rawValue = closestPoint[1];
-        if (rawValue === null || rawValue === undefined) continue;
-
+        // Aplikujeme formátování (decimals, units)
         const decimals = isDefinedAndNotNull(dataKey.decimals) ? dataKey.decimals : this.ctx.decimals;
         const units = isDefinedAndNotNull(dataKey.units) ? dataKey.units : this.ctx.units;
         const valueFormatter = ValueFormatProcessor.fromSettings(this.ctx.$injector, {units, decimals});
         const formattedValue = valueFormatter.format(rawValue);
 
+        // Vykreslení řádku
         const row = this.createTooltipRow(dataKey.color, dataKey.label, formattedValue);
         this.renderer.appendChild(tooltipItemsElement, row);
       }
@@ -564,6 +353,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     return tooltipElement;
   }
 
+  // Helper pro vytvoření řádku (vytaženo z původní logiky pro přehlednost)
   private createTooltipRow(color: string, label: string, valueText: string): HTMLElement {
     const labelValueElement: HTMLElement = this.renderer.createElement('div');
     this.renderer.setStyle(labelValueElement, 'display', 'flex');
@@ -606,28 +396,39 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   }
   
   private setupAnimationSettings(): object {
-      return  { animation: false }
+      return  {
+        animation: true,
+        animationDelay: 0,
+        animationDelayUpdate: 0,
+        animationDuration: 500,
+        animationDurationUpdate: 300,
+        animationEasing: "cubicOut",
+        animationEasingUpdate: "cubicOut",
+        animationThreshold: 2000
+      }
   }
 
   private setupChartLines(): SeriesOption[] {
     const series: SeriesOption[] = [];
-    if (this.ctx.datasources.length > 0) {
-      for(const [index, dataKey] of this.ctx.datasources[0].dataKeys.entries()) {
-        series.push({
-          id: index,
-          name: dataKey.label,
-          type: 'line',
-          sampling: 'lttb',
-          connectNulls: false,
-          showSymbol: false,
-          smooth: false,
-          step: false,
-          stackStrategy: 'all',
-          data: [],
-          lineStyle: { color: dataKey.color },
-          itemStyle: { color: dataKey.color }
-        });
-      }
+    for(const [index, dataKey] of this.ctx.datasources[0].dataKeys.entries()) {
+      series.push({
+        id: index,
+        name: dataKey.label,
+        type: 'line',
+        sampling: 'lttb',
+        connectNulls: false,
+        showSymbol: false,
+        smooth: false,
+        step: false,
+        stackStrategy: 'all',
+        data: [],
+        lineStyle: {
+          color: dataKey.color
+        },
+        itemStyle: {
+          color: dataKey.color
+        }
+      })
     }
     return series;
   }
@@ -656,23 +457,42 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
           return this.valueFormatter.format(value);
         }
       },
-      splitLine: { show: true },
-      axisLine: { show: true, lineStyle: { color: 'rgba(0, 0, 0, 0.54)' } },
-      axisTick: { lineStyle: { color: 'rgba(0, 0, 0, 0.54)' }, show: true },
+      splitLine: {
+        show: true,
+      },
+      axisLine: {
+        show: true,
+        lineStyle: {
+          color: 'rgba(0, 0, 0, 0.54)'
+        }
+      },
+      axisTick: {
+        lineStyle: {
+          color: 'rgba(0, 0, 0, 0.54)'
+        },
+        show: true
+      },
       nameTextStyle: {
-        color: 'rgba(0, 0, 0, 0.54)', fontFamily: 'Roboto', fontSize: 12, fontStyle: 'normal', fontWeight: 600
+        color: 'rgba(0, 0, 0, 0.54)',
+        fontFamily: 'Roboto',
+        fontSize: 12,
+        fontStyle: 'normal',
+        fontWeight: 600
       }
     }
   }
-
+  // Pomocná metoda pro nalezení nejbližšího bodu v datech (Binary Search)
   private findClosestPoint(data: [number, any][], targetTimestamp: number): [number, number] | null {
     if (!data || data.length === 0) return null;
+
     let left = 0;
     let right = data.length - 1;
 
+    // Pokud je mimo rozsah, vrať krajní body
     if (targetTimestamp <= data[0][0]) return data[0];
     if (targetTimestamp >= data[right][0]) return data[right];
 
+    // Binární vyhledávání
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
       if (data[mid][0] === targetTimestamp) {
@@ -683,6 +503,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
         right = mid - 1;
       }
     }
+
+    // Nyní 'left' a 'right' jsou indexy kolem hledaného času. Zjistíme, který je blíž.
     const prev = data[right];
     const next = data[left];
 
@@ -702,21 +524,45 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
       name: 'XAxis',
       offset: 0,
       nameLocation: 'middle',
-      // Min a Max se nastavují dynamicky v updateXAxisView, zde init default
       max:  this.ctx.defaultSubscription.timeWindow.maxTime,
       min:  this.ctx.defaultSubscription.timeWindow.minTime,
       nameTextStyle: {
-        color: 'rgba(0, 0, 0, 0.54)', fontStyle: 'normal', fontWeight: 600, fontFamily: 'Roboto', fontSize: 12,
+        color: 'rgba(0, 0, 0, 0.54)',
+        fontStyle: 'normal',
+        fontWeight: 600,
+        fontFamily: 'Roboto',
+        fontSize: 12,
       },
       axisPointer: {
         snap: true,
-        shadowStyle: { color: 'rgba(210,219,238,0.2)' }
+        shadowStyle: {
+          color: 'rgba(210,219,238,0.2)'
+        }
       },
-      splitLine: { show: true },
-      axisTick: { show: true, lineStyle: { color: 'rgba(0, 0, 0, 0.54)' } },
-      axisLine: { onZero: false, show: true, lineStyle: { color: 'rgba(0, 0, 0, 0.54)' } },
+      splitLine: {
+        show: true
+      },
+      axisTick: {
+        show: true,
+        lineStyle: {
+          color: 'rgba(0, 0, 0, 0.54)'
+        }
+      },
+      axisLine: {
+        onZero: false,
+        show: true,
+        lineStyle: {
+          color: 'rgba(0, 0, 0, 0.54)'
+        }
+      },
       axisLabel: {
-        color: 'rgba(0, 0, 0, 0.54)', fontFamily: 'Roboto', fontSize: 10, fontStyle: 'normal', fontWeight: 400, show: true, hideOverlap: true,
+        color: 'rgba(0, 0, 0, 0.54)',
+        fontFamily: 'Roboto',
+        fontSize: 10,
+        fontStyle: 'normal',
+        fontWeight: 400,
+        show: true,
+        hideOverlap: true,
       }
     }
   }
