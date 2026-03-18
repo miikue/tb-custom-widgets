@@ -27,5 +27,6 @@ export * from '../miikue-time-formatter/miikue-time-formatter.component';
 export * from '../miikue-communication/miikue-communication.component';
 export * from '../miikue-stavy/miikue-stavy.component';
 export * from '../miikue-chart-line/miikue-chart-line.component';
+export * from '../miikue-chart-line/chart-settings/miikue-chart-line-basic-config.component';
 export * from '../miikue-time-window-selector/miikue-time-window-selector.component';
 export * from '../miikue-time-input/miikue-time-input.component';

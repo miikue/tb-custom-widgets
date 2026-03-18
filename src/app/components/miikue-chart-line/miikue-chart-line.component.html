@@ -5,7 +5,8 @@
   </ng-container>
   <div class="tb-time-series-chart-content" [class]="legendClass">
     <div #echartContainer class="tb-time-series-chart-shape"></div>
-    <div *ngIf="showLegend" class="tb-time-series-chart-legend">
+    <div *ngIf="showLegend" class="tb-time-series-chart-legend" [class.tb-simple-legend]="!hasLegendStats()">
+      <ng-container *ngIf="hasLegendStats(); else simpleLegend">
       <table class="tb-time-series-chart-legend-table vertical">
         <thead>
         <tr>
@@ -40,6 +41,15 @@
         </tr>
         </tbody>
       </table>
+      </ng-container>
+
+      <ng-template #simpleLegend>
+        <div class="tb-time-series-chart-simple-legend-items">
+          <ng-container *ngFor="let legendKey of legendKeys">
+            <ng-container *ngTemplateOutlet="legendItem; context:{legendKey: legendKey, left: false}"></ng-container>
+          </ng-container>
+        </div>
+      </ng-template>
     </div>
     <ng-template #legendItem let-legendKey="legendKey" let-left="left">
       <div class="tb-time-series-chart-legend-item"

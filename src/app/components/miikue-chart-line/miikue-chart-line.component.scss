@@ -92,6 +92,15 @@ $maxLegendHeight: 35%;
       width: fit-content;
       max-width: 100%;
       max-height: calc($maxLegendHeight - 8px);
+      &.tb-simple-legend {
+        .tb-time-series-chart-simple-legend-items {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px 16px;
+          width: 100%;
+          align-items: center;
+        }
+      }
       .tb-time-series-chart-legend-table {
         border-spacing: 0;
         table-layout: fixed;

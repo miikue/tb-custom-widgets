@@ -210,6 +210,16 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     return this.hiddenSeriesIndexes.has(legendKey.dataIndex);
   }
 
+  public hasLegendStats(): boolean {
+    return !!(
+      this.legendConfig?.showMin ||
+      this.legendConfig?.showMax ||
+      this.legendConfig?.showAvg ||
+      this.legendConfig?.showTotal ||
+      this.legendConfig?.showLatest
+    );
+  }
+
   private buildVisibleSeries(): SeriesOption[] {
     const baseSeries = this.setupChartLines();
     return baseSeries.map((series, index) => ({
@@ -242,6 +252,10 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   };
 
   private resolveMaxGapMs(): number {
+    const settingsGapSeconds = Number(this.ctx?.settings?.maxConnectedGapSeconds);
+    if (Number.isFinite(settingsGapSeconds) && settingsGapSeconds > 0) {
+      return settingsGapSeconds * 1000;
+    }
     return this.maxConnectedGapSeconds > 0 ? this.maxConnectedGapSeconds * 1000 : 0;
   }
 

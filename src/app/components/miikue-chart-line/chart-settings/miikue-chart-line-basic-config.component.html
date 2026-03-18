@@ -1,0 +1,29 @@
+<div [formGroup]="configFormGroup">
+  <tb-datasources
+    [configMode]="basicMode"
+    hideDataKeys
+    formControlName="datasources">
+  </tb-datasources>
+
+  <tb-data-keys-panel
+    panelTitle="Body"
+    addKeyTitle="Přidat bod"
+    keySettingsTitle="Nastavení bodu"
+    removeKeyTitle="Odebrat bod"
+    noKeysText="Nejsou nastavené žádné body"
+    hideDataKeyColor
+    [datasourceType]="datasource?.type"
+    [deviceId]="datasource?.deviceId"
+    [entityAliasId]="datasource?.entityAliasId"
+    formControlName="dataKeys">
+  </tb-data-keys-panel>
+
+  <mat-form-field>
+    <mat-label>Limit mezer (sekundy)</mat-label>
+    <input matInput type="number" min="0" formControlName="maxConnectedGapSeconds"/>
+  </mat-form-field>
+
+  <tb-widget-actions-panel
+    formControlName="actions">
+  </tb-widget-actions-panel>
+</div>

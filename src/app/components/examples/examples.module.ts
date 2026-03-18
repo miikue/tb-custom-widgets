@@ -46,6 +46,7 @@ import { MiikueTimeFormatterComponent } from '../miikue-time-formatter/miikue-ti
 import { MiikueCommunicationComponent } from '../miikue-communication/miikue-communication.component';
 import { MiikueStavyComponent } from '../miikue-stavy/miikue-stavy.component';
 import { MiikueChartLineComponent } from '../miikue-chart-line/miikue-chart-line.component';
+import { MiikueChartLineBasicConfigComponent } from '../miikue-chart-line/chart-settings/miikue-chart-line-basic-config.component';
 import { MiikueTimeWindowSelectorComponent } from '../miikue-time-window-selector/miikue-time-window-selector.component';
 import { MiikueTimeInputComponent } from '../miikue-time-input/miikue-time-input.component';
 
@@ -83,6 +84,7 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MiikueCommunicationComponent,
     MiikueStavyComponent,
     MiikueChartLineComponent,
+    MiikueChartLineBasicConfigComponent,
     MiikueTimeWindowSelectorComponent,
     MiikueTimeInputComponent
   ],
@@ -127,6 +129,7 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MiikueCommunicationComponent,
     MiikueStavyComponent,
     MiikueChartLineComponent,
+    MiikueChartLineBasicConfigComponent,
     MiikueTimeWindowSelectorComponent,
     MiikueTimeInputComponent
   ],
