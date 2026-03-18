@@ -9,6 +9,7 @@ import {
   TemplateRef,
   ViewChild
 } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import * as echarts from 'echarts/core';
 import { EChartsOption, SeriesOption } from 'echarts';
 import { WidgetContext } from '@home/models/widget-component.models';
@@ -57,6 +58,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   private option: EChartsOption;
   private latestSeriesData: any[][] = [];
   private hiddenSeriesIndexes = new Set<number>();
+  private historyLoadInProgress = false;
+  private historyWindowSignature = '';
 
   private valueFormatter: ValueFormatProcessor;
 
@@ -69,6 +72,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   constructor(
     private renderer: Renderer2,
     private sanitizer: DomSanitizer,
+    private http: HttpClient,
     public widgetComponent: WidgetComponent,
   ) {}
 
@@ -187,6 +191,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       series: this.option.series
     });
     this.updateAxisOffset();
+    this.loadOlderHistoryIfNeeded();
   }
 
   public toggleLegendSeries(legendKey: LegendKey): void {
@@ -257,6 +262,162 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       return settingsGapSeconds * 1000;
     }
     return this.maxConnectedGapSeconds > 0 ? this.maxConnectedGapSeconds * 1000 : 0;
+  }
+
+  private loadOlderHistoryIfNeeded(): void {
+    const window = this.ctx?.defaultSubscription?.timeWindow;
+    if (!window || !this.ctx?.data) {
+      return;
+    }
+
+    const datasources = this.ctx?.defaultSubscription?.datasources || this.ctx?.datasources;
+    const firstDatasource = datasources?.[0];
+    const entityType = firstDatasource?.entityType;
+    const entityId = firstDatasource?.entityId;
+    if (!entityType || !entityId) {
+      return;
+    }
+
+    const dataEntries = Object.values(this.ctx.data || {}) as unknown as Array<{
+      data: Array<any>,
+      dataKey: { name: string }
+    }>;
+    if (!dataEntries.length) {
+      return;
+    }
+
+    const keyNames = dataEntries
+      .map(entry => entry?.dataKey?.name)
+      .filter(name => !!name);
+    if (!keyNames.length) {
+      return;
+    }
+
+    const earliestTs = this.findEarliestTs(dataEntries);
+    if (!isDefinedAndNotNull(earliestTs)) {
+      return;
+    }
+
+    const signature = `${entityType}|${entityId}|${window.minTime}|${window.maxTime}|${keyNames.join(',')}`;
+    if (signature !== this.historyWindowSignature) {
+      this.historyWindowSignature = signature;
+      this.historyLoadInProgress = false;
+    }
+
+    if (earliestTs <= window.minTime || this.historyLoadInProgress) {
+      return;
+    }
+
+    const batchMs = 7 * 24 * 60 * 60 * 1000;
+    const endTs = earliestTs - 1;
+    const startTs = Math.max(window.minTime, endTs - batchMs + 1);
+    const keysQuery = encodeURIComponent(keyNames.join(','));
+    const url = `/api/plugins/telemetry/${entityType}/${entityId}/values/timeseries` +
+      `?keys=${keysQuery}` +
+      `&startTs=${startTs}` +
+      `&endTs=${endTs}` +
+      `&limit=50000` +
+      `&agg=NONE` +
+      `&orderBy=ASC`;
+
+    this.historyLoadInProgress = true;
+    this.http.get(url).subscribe({
+      next: (response: any) => {
+        this.historyLoadInProgress = false;
+        const mergedCount = this.mergeHistoryResponse(response, window.minTime);
+        if (mergedCount > 0) {
+          this.onDataUpdated();
+        }
+      },
+      error: () => {
+        this.historyLoadInProgress = false;
+      }
+    });
+  }
+
+  private findEarliestTs(dataEntries: Array<{ data: Array<[number, any]> }>): number | null {
+    let earliest: number = null;
+    for (const entry of dataEntries) {
+      if (!entry?.data?.length) {
+        continue;
+      }
+      const tsValues = entry.data
+        .map(point => this.normalizePoint(point))
+        .filter(point => !!point)
+        .map(point => Number(point[0]));
+      if (!tsValues.length) {
+        continue;
+      }
+      const firstTs = Math.min(...tsValues);
+      if (!Number.isFinite(firstTs)) {
+        continue;
+      }
+      if (!isDefinedAndNotNull(earliest) || firstTs < earliest) {
+        earliest = firstTs;
+      }
+    }
+    return earliest;
+  }
+
+  private mergeHistoryResponse(response: any, minTime: number): number {
+    if (!response || typeof response !== 'object') {
+      return 0;
+    }
+
+    let mergedPoints = 0;
+    for (const key in this.ctx.data) {
+      const seriesEntry = this.ctx.data[key];
+      const seriesKeyName = seriesEntry?.dataKey?.name;
+      if (!seriesKeyName) {
+        continue;
+      }
+
+      const historyItems = Array.isArray(response[seriesKeyName]) ? response[seriesKeyName] : [];
+      if (!historyItems.length) {
+        continue;
+      }
+
+      const mergedMap = new Map<number, any>();
+      for (const point of seriesEntry.data || []) {
+        const normalizedPoint = this.normalizePoint(point);
+        if (!normalizedPoint) {
+          continue;
+        }
+        const [ts, value] = normalizedPoint;
+        const numericTs = Number(ts);
+        if (Number.isFinite(numericTs)) {
+          mergedMap.set(numericTs, value);
+        }
+      }
+
+      for (const item of historyItems) {
+        const itemTs = Number(item?.ts);
+        if (!Number.isFinite(itemTs) || itemTs < minTime) {
+          continue;
+        }
+        if (!mergedMap.has(itemTs)) {
+          mergedPoints++;
+        }
+        mergedMap.set(itemTs, item?.value);
+      }
+
+      seriesEntry.data = Array.from(mergedMap.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([ts, value]) => [ts, value]);
+    }
+
+    return mergedPoints;
+  }
+
+  private normalizePoint(point: any): [number, any] | null {
+    if (!Array.isArray(point) || point.length < 2) {
+      return null;
+    }
+    const ts = Number(point[0]);
+    if (!Number.isFinite(ts)) {
+      return null;
+    }
+    return [ts, point[1]];
   }
 
   private initEchart(): void {
