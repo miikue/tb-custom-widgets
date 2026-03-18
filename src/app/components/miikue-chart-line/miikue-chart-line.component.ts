@@ -35,24 +35,19 @@ import { ECharts } from '@home/components/widget/lib/chart/echarts-widget.models
 @Component({
   selector: 'tb-miikue-chart-line',
   templateUrl: './miikue-chart-line.component.html',
-  styleUrls: ['./miikue-chart-line.component.scss']
+  styleUrls: ['./miikue-chart-line.component.scss'],
+  standalone: false
 })
 export class MiikueChartLineComponent implements OnInit, AfterViewInit {
 
-  private _echartContainer: ElementRef<HTMLElement>;
-  @ViewChild('echartContainer', {static: false}) set echartContainer(container: ElementRef<HTMLElement>) {
-    if (container) {
-      this._echartContainer = container;
-      this.initChart();
-    }
-  }
+  @ViewChild('echartContainer', {static: false}) echartContainer: ElementRef<HTMLElement>;
 
   @Input() ctx: WidgetContext;
 
 
   @Input() showSmallGraph: boolean = true;
   @Input() fullscreen: boolean = false;
-  @Input() maxSplitTime: number = 0;
+  @Input() maxConnectedGapSeconds: number = 0;
   @Input() widgetTitlePanel: TemplateRef<any>;
 
   private myChart: ECharts;
@@ -69,10 +64,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   public legendKeys: Array<LegendKey>;
   public showLegend: boolean;
 
-  public get shouldRender(): boolean {
-    return this.showSmallGraph || this.fullscreen;
-  }
-
   constructor(
     private renderer: Renderer2,
     private sanitizer: DomSanitizer,
@@ -88,10 +79,11 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+    this.initChart();
   }
 
   private initChart(): void {
-    this.myChart = echarts.init(this._echartContainer.nativeElement,  null, {
+    this.myChart = echarts.init(this.echartContainer.nativeElement, null, {
       renderer: 'canvas'
     });
     this.initResize();
@@ -134,14 +126,14 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
           type: 'inside',
           disabled: false,
           realtime: true,
-          filterMode:  'filter'
+          filterMode: 'none'
         },
         {
           type: 'slider',
           show: true,
           showDetail: false,
           realtime: true,
-          filterMode: 'filter',
+          filterMode: 'none',
           bottom: 5
         }
       ]
@@ -152,62 +144,46 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   }
 
   public onDataUpdated() {
-    if (!this.myChart || !this.shouldRender) {
+    if (!this.myChart) {
       return;
     }
-    const newData = {};
+    const newData = [];
+    const maxGapMs = this.resolveMaxGapMs();
     this.onResize();
     this.updateXAxisTimeWindow(this.xAxis, this.ctx.defaultSubscription.timeWindow);
 
     for (const key in this.ctx.data) {
-      const dataKey = this.ctx.data[key].dataKey;
-      const decimals = isDefinedAndNotNull(dataKey.decimals) ? dataKey.decimals : this.ctx.decimals;
-      const factor = Math.pow(10, decimals);
-
       newData[key] = [];
-      let lastTs = 0;
-      
-      // Ensure data is sorted by timestamp, as ThingsBoard doesn't guarantee order
-      const sortedData = this.ctx.data[key].data.sort((a, b) => a[0] - b[0]);
+      const sortedData = [...this.ctx.data[key].data].sort((a, b) => a[0] - b[0]);
+      let lastTs: number = null;
 
       for (const [ts, value] of sortedData) {
-        // Check for a gap if maxSplitTime is set and this is not the first point
-        if (this.maxSplitTime > 0 && lastTs > 0 && (ts - lastTs > this.maxSplitTime)) {          // Insert a null point to create a break in the line
+        if (maxGapMs > 0 && isDefinedAndNotNull(lastTs) && ts - lastTs > maxGapMs) {
           newData[key].push({
-            name: ts - 100, // Placeholder timestamp
-            value: [ts-10, null]
+            name: ts,
+            value: [ts - 1, null]
           });
         }
-        
-        // Add the actual data point
+
         newData[key].push({
           name: ts,
           value: [
             ts,
-            Math.trunc(Number(value) * factor) / factor
+            this.valueFormatter.format(value)
           ]
         });
+
         lastTs = ts;
       }
     }
 
-    const currentSeries = Array.isArray(this.option.series) ? this.option.series : [this.option.series];
-    const newSeries = [];
-    for (const series of currentSeries) {
-        const data = newData[series.id];
-        if(data) {
-          newSeries.push({...series, data});
-        } else {
-          newSeries.push(series);
-        }
+    const linesData = [];
+    for (const data of newData) {
+      linesData.push({data});
     }
-    this.option.series = newSeries;
-    
-    this.myChart.setOption({
-      xAxis: this.xAxis,
-      series: newSeries
-    });
+    this.option.series = linesData;
 
+    this.myChart.setOption(this.option);
     this.updateAxisOffset();
   }
 
@@ -233,6 +209,10 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     option.min = timeWindow.minTime;
     option.max = timeWindow.maxTime;
   };
+
+  private resolveMaxGapMs(): number {
+    return this.maxConnectedGapSeconds > 0 ? this.maxConnectedGapSeconds * 1000 : 0;
+  }
 
   private initEchart(): void {
     echarts.use([
@@ -273,10 +253,10 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     this.shapeResize$ = new ResizeObserver(() => {
       this.onResize();
     });
-    this.shapeResize$.observe(this._echartContainer.nativeElement);
+    this.shapeResize$.observe(this.echartContainer.nativeElement);
   }
 
-private onResize() {
+  private onResize() {
     if (this.myChart) {
       this.myChart.resize();
     }
@@ -287,74 +267,32 @@ private onResize() {
     this.valueFormatter = ValueFormatProcessor.fromSettings(this.ctx.$injector, {units, decimals: this.ctx.decimals});
   }
 
-private setupTooltipElement(params: CallbackDataParams[]): HTMLElement {
-    if (!params || params.length === 0) return null;
-
-    // 1. Získáme čas z bodu, na kterém je kurzor (snapnutý bod)
-    const hoverTimestamp = params[0].value[0] as number;
-
+  private setupTooltipElement(params: CallbackDataParams[]): HTMLElement {
     const tooltipElement: HTMLElement = this.renderer.createElement('div');
     this.renderer.setStyle(tooltipElement, 'display', 'flex');
     this.renderer.setStyle(tooltipElement, 'flex-direction', 'column');
     this.renderer.setStyle(tooltipElement, 'align-items', 'flex-start');
     this.renderer.setStyle(tooltipElement, 'gap', '16px');
 
-    // Hlavička s datem
-    const tooltipItemsElement: HTMLElement = this.renderer.createElement('div');
-    this.renderer.setStyle(tooltipItemsElement, 'display', 'flex');
-    this.renderer.setStyle(tooltipItemsElement, 'flex-direction', 'column');
-    this.renderer.setStyle(tooltipItemsElement, 'align-items', 'flex-start');
-    this.renderer.setStyle(tooltipItemsElement, 'gap', '4px');
+    if (params.length) {
+      const tooltipItemsElement: HTMLElement = this.renderer.createElement('div');
+      this.renderer.setStyle(tooltipItemsElement, 'display', 'flex');
+      this.renderer.setStyle(tooltipItemsElement, 'flex-direction', 'column');
+      this.renderer.setStyle(tooltipItemsElement, 'align-items', 'flex-start');
+      this.renderer.setStyle(tooltipItemsElement, 'gap', '4px');
 
-    // Použijeme hoverTimestamp pro zobrazení data
-    const dateElement: HTMLElement = this.renderer.createElement('div');
-    this.renderer.appendChild(dateElement, this.renderer.createText(new Date(hoverTimestamp).toLocaleString('en-GB')));
-    this.renderer.setStyle(dateElement, 'font-family', 'Roboto');
-    this.renderer.setStyle(dateElement, 'font-size', '11px');
-    this.renderer.setStyle(dateElement, 'font-style', 'normal');
-    this.renderer.setStyle(dateElement, 'font-weight', '400');
-    this.renderer.setStyle(dateElement, 'line-height', '16px');
-    this.renderer.setStyle(dateElement, 'color', 'rgba(0, 0, 0, 0.76)');
-    
-    this.renderer.appendChild(tooltipItemsElement, dateElement);
+      this.renderer.appendChild(tooltipItemsElement, this.setTooltipDate(params));
 
-
-    // 2. Iterujeme přes VŠECHNY datové zdroje (ne jen přes params)
-    // Seřadíme je podle klíče/legendy, aby se pořadí neměnilo
-    const sortedDataKeys = Object.values(this.ctx.data).sort((a: any, b: any) => {
-       return a.dataKey.label.localeCompare(b.dataKey.label);
-    });
-
-    for (const item of sortedDataKeys as any[]) {
-      const dataKey = item.dataKey;
-      const data = item.data; // Raw data pole
-
-      // 3. Najdeme nejbližší bod v této sérii pro aktuální čas
-      const closestPoint = this.findClosestPoint(data, hoverTimestamp);
-      
-      if (closestPoint) {
-        // Vytvoříme falešný "param" objekt, abychom mohli recyklovat vaši metodu constructTooltipSeriesElement
-        // nebo si vytvoříme řádek přímo zde (čistší řešení níže)
-        
-        const rawValue = closestPoint[1];
-        // Aplikujeme formátování (decimals, units)
-        const decimals = isDefinedAndNotNull(dataKey.decimals) ? dataKey.decimals : this.ctx.decimals;
-        const units = isDefinedAndNotNull(dataKey.units) ? dataKey.units : this.ctx.units;
-        const valueFormatter = ValueFormatProcessor.fromSettings(this.ctx.$injector, {units, decimals});
-        const formattedValue = valueFormatter.format(rawValue);
-
-        // Vykreslení řádku
-        const row = this.createTooltipRow(dataKey.color, dataKey.label, formattedValue);
-        this.renderer.appendChild(tooltipItemsElement, row);
+      for (const [i, param] of params.entries()) {
+        this.renderer.appendChild(tooltipItemsElement, this.constructTooltipSeriesElement(param, i));
       }
-    }
 
-    this.renderer.appendChild(tooltipElement, tooltipItemsElement);
+      this.renderer.appendChild(tooltipElement, tooltipItemsElement);
+    }
     return tooltipElement;
   }
 
-  // Helper pro vytvoření řádku (vytaženo z původní logiky pro přehlednost)
-  private createTooltipRow(color: string, label: string, valueText: string): HTMLElement {
+  private constructTooltipSeriesElement(param: CallbackDataParams, index: number): HTMLElement {
     const labelValueElement: HTMLElement = this.renderer.createElement('div');
     this.renderer.setStyle(labelValueElement, 'display', 'flex');
     this.renderer.setStyle(labelValueElement, 'flex-direction', 'row');
@@ -372,27 +310,50 @@ private setupTooltipElement(params: CallbackDataParams[]): HTMLElement {
     this.renderer.setStyle(circleElement, 'width', '8px');
     this.renderer.setStyle(circleElement, 'height', '8px');
     this.renderer.setStyle(circleElement, 'border-radius', '50%');
-    this.renderer.setStyle(circleElement, 'background', color);
+    this.renderer.setStyle(circleElement, 'background', param.color);
     this.renderer.appendChild(labelElement, circleElement);
 
     const labelTextElement: HTMLElement = this.renderer.createElement('div');
-    this.renderer.setProperty(labelTextElement, 'innerHTML', this.sanitizer.sanitize(SecurityContext.HTML, label));
+    this.renderer.setProperty(labelTextElement, 'innerHTML', this.sanitizer.sanitize(SecurityContext.HTML, param.seriesName));
     this.renderer.setStyle(labelTextElement, 'font-family', 'Roboto');
     this.renderer.setStyle(labelTextElement, 'font-size', '12px');
+    this.renderer.setStyle(labelTextElement, 'font-style', 'normal');
+    this.renderer.setStyle(labelTextElement, 'font-weight', 400);
+    this.renderer.setStyle(labelTextElement, 'line-height', '16px');
     this.renderer.setStyle(labelTextElement, 'color', 'rgba(0, 0, 0, 0.76)');
     this.renderer.appendChild(labelElement, labelTextElement);
 
+    const decimals = isDefinedAndNotNull(this.ctx.data[index].dataKey.decimals) ?
+      this.ctx.data[index].dataKey.decimals : this.ctx.decimals;
+    const units = isDefinedAndNotNull(this.ctx.data[index].dataKey.units) ?
+      this.ctx.data[index].dataKey.units : this.ctx.units;
+    const valueFormatter = ValueFormatProcessor.fromSettings(this.ctx.$injector, {units, decimals});
+    const value = valueFormatter.format(param.value[1]);
+
     const valueElement: HTMLElement = this.renderer.createElement('div');
-    this.renderer.setProperty(valueElement, 'innerHTML', this.sanitizer.sanitize(SecurityContext.HTML, valueText));
+    this.renderer.setProperty(valueElement, 'innerHTML', this.sanitizer.sanitize(SecurityContext.HTML, value));
     this.renderer.setStyle(valueElement, 'flex', '1');
     this.renderer.setStyle(valueElement, 'text-align', 'end');
     this.renderer.setStyle(valueElement, 'font-family', 'Roboto');
     this.renderer.setStyle(valueElement, 'font-size', '12px');
+    this.renderer.setStyle(valueElement, 'font-style', 'normal');
     this.renderer.setStyle(valueElement, 'font-weight', 500);
+    this.renderer.setStyle(valueElement, 'line-height', '16px');
     this.renderer.setStyle(valueElement, 'color', 'rgba(0, 0, 0, 0.76)');
-    
     this.renderer.appendChild(labelValueElement, valueElement);
     return labelValueElement;
+  }
+
+  private setTooltipDate(params: CallbackDataParams[]): HTMLElement {
+    const dateElement: HTMLElement = this.renderer.createElement('div');
+    this.renderer.appendChild(dateElement, this.renderer.createText(new Date(params[0].value[0]).toLocaleString('en-GB')));
+    this.renderer.setStyle(dateElement, 'font-family', 'Roboto');
+    this.renderer.setStyle(dateElement, 'font-size', '11px');
+    this.renderer.setStyle(dateElement, 'font-style', 'normal');
+    this.renderer.setStyle(dateElement, 'font-weight', '400');
+    this.renderer.setStyle(dateElement, 'line-height', '16px');
+    this.renderer.setStyle(dateElement, 'color', 'rgba(0, 0, 0, 0.76)');
+    return dateElement;
   }
   
   private setupAnimationSettings(): object {
@@ -410,12 +371,11 @@ private setupTooltipElement(params: CallbackDataParams[]): HTMLElement {
 
   private setupChartLines(): SeriesOption[] {
     const series: SeriesOption[] = [];
-    for(const [index, dataKey] of this.ctx.datasources[0].dataKeys.entries()) {
+    for (const [index, dataKey] of this.ctx.datasources[0].dataKeys.entries()) {
       series.push({
         id: index,
         name: dataKey.label,
         type: 'line',
-        sampling: 'lttb',
         connectNulls: false,
         showSymbol: false,
         smooth: false,
@@ -481,38 +441,6 @@ private setupTooltipElement(params: CallbackDataParams[]): HTMLElement {
       }
     }
   }
-  // Pomocná metoda pro nalezení nejbližšího bodu v datech (Binary Search)
-  private findClosestPoint(data: [number, any][], targetTimestamp: number): [number, number] | null {
-    if (!data || data.length === 0) return null;
-
-    let left = 0;
-    let right = data.length - 1;
-
-    // Pokud je mimo rozsah, vrať krajní body
-    if (targetTimestamp <= data[0][0]) return data[0];
-    if (targetTimestamp >= data[right][0]) return data[right];
-
-    // Binární vyhledávání
-    while (left <= right) {
-      const mid = Math.floor((left + right) / 2);
-      if (data[mid][0] === targetTimestamp) {
-        return data[mid];
-      } else if (data[mid][0] < targetTimestamp) {
-        left = mid + 1;
-      } else {
-        right = mid - 1;
-      }
-    }
-
-    // Nyní 'left' a 'right' jsou indexy kolem hledaného času. Zjistíme, který je blíž.
-    const prev = data[right];
-    const next = data[left];
-
-    if (!prev) return next;
-    if (!next) return prev;
-
-    return (targetTimestamp - prev[0] < next[0] - targetTimestamp) ? prev : next;
-  }
 
   private setupXAxis(): XAXisOption {
     return {
@@ -534,7 +462,6 @@ private setupTooltipElement(params: CallbackDataParams[]): HTMLElement {
         fontSize: 12,
       },
       axisPointer: {
-        snap: true,
         shadowStyle: {
           color: 'rgba(210,219,238,0.2)'
         }

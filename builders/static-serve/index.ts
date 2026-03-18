@@ -115,7 +115,7 @@ export function createServer(options: StaticServeOptions, context: BuilderContex
       res.sendFile(resolve(context.workspaceRoot, 'dist/rulenode-core-config/bundles/rulenode-core-config.umd.js.map'));
     }); */
 
-  const host = 'localhost';
+    const host = '0.0.0.0';
   server = app.listen(options.port, host, 511, () => {
     context.logger.info(`==> 🌎  Listening on port ${options.port}. Open up http://localhost:${options.port}/ in your browser.`);
   });

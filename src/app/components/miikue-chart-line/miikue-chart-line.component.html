@@ -4,7 +4,7 @@
     <ng-container *ngTemplateOutlet="widgetTitlePanel"></ng-container>
   </ng-container>
   <div class="tb-time-series-chart-content" [class]="legendClass">
-    <div #echartContainer *ngIf="shouldRender" class="tb-time-series-chart-shape"></div>
+    <div #echartContainer class="tb-time-series-chart-shape"></div>
     <div *ngIf="showLegend" class="tb-time-series-chart-legend">
       <table class="tb-time-series-chart-legend-table vertical">
         <thead>
