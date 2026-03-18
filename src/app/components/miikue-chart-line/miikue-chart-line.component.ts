@@ -55,6 +55,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   private xAxis: XAXisOption;
   private yAxis: YAXisOption;
   private option: EChartsOption;
+  private latestSeriesData: any[][] = [];
+  private hiddenSeriesIndexes = new Set<number>();
 
   private valueFormatter: ValueFormatProcessor;
 
@@ -177,14 +179,43 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       }
     }
 
-    const linesData = [];
-    for (const data of newData) {
-      linesData.push({data});
-    }
-    this.option.series = linesData;
+    this.latestSeriesData = newData;
+    this.option.series = this.buildVisibleSeries();
 
-    this.myChart.setOption(this.option);
+    this.myChart.setOption({
+      xAxis: this.xAxis,
+      series: this.option.series
+    });
     this.updateAxisOffset();
+  }
+
+  public toggleLegendSeries(legendKey: LegendKey): void {
+    const index = legendKey.dataIndex;
+    if (this.hiddenSeriesIndexes.has(index)) {
+      this.hiddenSeriesIndexes.delete(index);
+    } else {
+      this.hiddenSeriesIndexes.add(index);
+    }
+
+    if (!this.myChart) {
+      return;
+    }
+
+    this.option.series = this.buildVisibleSeries();
+    this.myChart.setOption({series: this.option.series});
+    this.ctx.detectChanges();
+  }
+
+  public isLegendSeriesHidden(legendKey: LegendKey): boolean {
+    return this.hiddenSeriesIndexes.has(legendKey.dataIndex);
+  }
+
+  private buildVisibleSeries(): SeriesOption[] {
+    const baseSeries = this.setupChartLines();
+    return baseSeries.map((series, index) => ({
+      ...series,
+      data: this.hiddenSeriesIndexes.has(index) ? [] : (this.latestSeriesData[index] || [])
+    }));
   }
 
   //Support logic

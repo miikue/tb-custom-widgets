@@ -44,7 +44,9 @@
     <ng-template #legendItem let-legendKey="legendKey" let-left="left">
       <div class="tb-time-series-chart-legend-item"
            [class.left]="left">
-        <div class="tb-time-series-chart-legend-item-label">
+        <div class="tb-time-series-chart-legend-item-label"
+             [class.is-hidden]="isLegendSeriesHidden(legendKey)"
+             (click)="toggleLegendSeries(legendKey)">
           <div class="tb-time-series-chart-legend-item-label-circle" [style]="{background: legendKey.dataKey.color}"></div>
           <div class="legend legend-label-color" [innerHTML]="legendKey.dataKey.label | safe: 'html'"></div>
         </div>

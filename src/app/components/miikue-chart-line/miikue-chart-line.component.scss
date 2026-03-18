@@ -134,6 +134,15 @@ $maxLegendHeight: 35%;
           color: #ccc;
           white-space: nowrap;
           cursor: pointer;
+          &.is-hidden {
+            opacity: 0.45;
+            .tb-time-series-chart-legend-item-label-circle {
+              opacity: 0.45;
+            }
+            .legend-label-color {
+              text-decoration: line-through;
+            }
+          }
           .tb-time-series-chart-legend-item-label-circle {
             width: 8px;
             height: 8px;
