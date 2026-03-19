@@ -3,6 +3,15 @@
   <ng-container *ngIf="widgetComponent.dashboardWidget.showWidgetTitlePanel">
     <ng-container *ngTemplateOutlet="widgetTitlePanel"></ng-container>
   </ng-container>
+  <div class="tb-time-series-chart-controls" *ngIf="currentTimeWindow">
+    <app-miikue-time-window-selector
+      [initialTimeWindow]="currentTimeWindow"
+      (timeWindowChange)="onTimeWindowChange($event)"
+      [showTimeSelection]="true"
+      [showQuickSelections]="true">
+    </app-miikue-time-window-selector>
+    <button class="tb-time-series-chart-reset-btn" type="button" (click)="resetTimeWindow()">Odzoom</button>
+  </div>
   <div class="tb-time-series-chart-content" [class]="legendClass">
     <div #echartContainer class="tb-time-series-chart-shape"></div>
     <div *ngIf="showLegend" class="tb-time-series-chart-legend" [class.tb-simple-legend]="!hasLegendStats()">

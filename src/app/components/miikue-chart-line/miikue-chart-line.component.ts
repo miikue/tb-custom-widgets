@@ -32,6 +32,7 @@ import { DomSanitizer } from '@angular/platform-browser';
 import { isDefinedAndNotNull } from '@core/public-api';
 import { calculateAxisSize, measureAxisNameSize } from '@home/components/public-api';
 import { ECharts } from '@home/components/widget/lib/chart/echarts-widget.models';
+import { TimeWindow } from '../miikue-time-window-selector/miikue-time-window-selector.component';
 
 @Component({
   selector: 'tb-miikue-chart-line',
@@ -68,6 +69,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   public legendData: LegendData;
   public legendKeys: Array<LegendKey>;
   public showLegend: boolean;
+  public currentTimeWindow: TimeWindow;
 
   constructor(
     private renderer: Renderer2,
@@ -79,9 +81,24 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   //Core logic
   ngOnInit(): void {
     this.ctx.$scope.miikueChartLineWidget = this;
+    this.syncCurrentTimeWindowFromSubscription();
     this.prepareValueFormat();
     this.initEchart();
     this.initLegend();
+  }
+
+  public onTimeWindowChange(newTimeWindow: TimeWindow): void {
+    if (!newTimeWindow?.startTs || !newTimeWindow?.endTs) {
+      return;
+    }
+
+    this.currentTimeWindow = newTimeWindow;
+    this.ctx?.timewindowFunctions?.onUpdateTimewindow(newTimeWindow.startTs, newTimeWindow.endTs);
+  }
+
+  public resetTimeWindow(): void {
+    this.ctx?.timewindowFunctions?.onResetTimewindow();
+    this.syncCurrentTimeWindowFromSubscription();
   }
 
   ngAfterViewInit(): void {
@@ -136,7 +153,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
         },
         {
           type: 'slider',
-          show: true,
+          show: false,
           showDetail: false,
           realtime: true,
           filterMode: 'none',
@@ -153,6 +170,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     if (!this.myChart) {
       return;
     }
+    this.syncCurrentTimeWindowFromSubscription();
     const newData = [];
     const maxGapMs = this.resolveMaxGapMs();
     this.onResize();
@@ -255,6 +273,17 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     option.min = timeWindow.minTime;
     option.max = timeWindow.maxTime;
   };
+
+  private syncCurrentTimeWindowFromSubscription(): void {
+    const subscriptionTimeWindow = this.ctx?.defaultSubscription?.timeWindow;
+    if (!subscriptionTimeWindow) {
+      return;
+    }
+    this.currentTimeWindow = {
+      startTs: subscriptionTimeWindow.minTime,
+      endTs: subscriptionTimeWindow.maxTime
+    };
+  }
 
   private resolveMaxGapMs(): number {
     const settingsGapSeconds = Number(this.ctx?.settings?.maxConnectedGapSeconds);
@@ -606,7 +635,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       mainType: 'yAxis',
       id: 'yAxis',
       offset: 0,
-      name: 'YAxis',
+      name: '',
       nameLocation: 'middle',
       nameRotate: 90,
       alignTicks: true,
@@ -655,7 +684,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       show: true,
       type: 'time',
       position: "bottom",
-      name: 'XAxis',
+      name: '',
       offset: 0,
       nameLocation: 'middle',
       max:  this.ctx.defaultSubscription.timeWindow.maxTime,
