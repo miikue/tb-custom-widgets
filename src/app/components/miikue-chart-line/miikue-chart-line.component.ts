@@ -61,6 +61,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   private hiddenSeriesIndexes = new Set<number>();
   private historyLoadInProgress = false;
   private historyWindowSignature = '';
+  private lastHistoryRequestTs = 0;
 
   private valueFormatter: ValueFormatProcessor;
 
@@ -171,14 +172,18 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       return;
     }
     this.syncCurrentTimeWindowFromSubscription();
+    const activeTimeWindow = this.getActiveTimeWindow();
     const newData = [];
     const maxGapMs = this.resolveMaxGapMs();
     this.onResize();
-    this.updateXAxisTimeWindow(this.xAxis, this.ctx.defaultSubscription.timeWindow);
+    if (activeTimeWindow) {
+      this.updateXAxisTimeWindow(this.xAxis, activeTimeWindow);
+    }
 
     for (const key in this.ctx.data) {
       newData[key] = [];
-      const sortedData = [...this.ctx.data[key].data].sort((a, b) => a[0] - b[0]);
+      const sourceData = this.ctx.data[key].data || [];
+      const sortedData = this.isSortedByTimestamp(sourceData) ? sourceData : [...sourceData].sort((a, b) => a[0] - b[0]);
       let lastTs: number = null;
 
       for (const [ts, value] of sortedData) {
@@ -274,14 +279,18 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     option.max = timeWindow.maxTime;
   };
 
+  private getActiveTimeWindow(): WidgetTimewindow | undefined {
+    return this.ctx?.defaultSubscription?.timeWindow || this.ctx?.timeWindow;
+  }
+
   private syncCurrentTimeWindowFromSubscription(): void {
-    const subscriptionTimeWindow = this.ctx?.defaultSubscription?.timeWindow;
-    if (!subscriptionTimeWindow) {
+    const activeTimeWindow = this.getActiveTimeWindow();
+    if (!activeTimeWindow) {
       return;
     }
     this.currentTimeWindow = {
-      startTs: subscriptionTimeWindow.minTime,
-      endTs: subscriptionTimeWindow.maxTime
+      startTs: activeTimeWindow.minTime,
+      endTs: activeTimeWindow.maxTime
     };
   }
 
@@ -294,6 +303,16 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   }
 
   private loadOlderHistoryIfNeeded(): void {
+    if (!this.isHistoryBackfillEnabled()) {
+      return;
+    }
+
+    const now = Date.now();
+    const cooldownMs = this.resolveHistoryBackfillCooldownMs();
+    if (this.lastHistoryRequestTs && now - this.lastHistoryRequestTs < cooldownMs) {
+      return;
+    }
+
     const window = this.ctx?.defaultSubscription?.timeWindow;
     if (!window || !this.ctx?.data) {
       return;
@@ -350,18 +369,43 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       `&orderBy=ASC`;
 
     this.historyLoadInProgress = true;
+    this.lastHistoryRequestTs = now;
     this.http.get(url).subscribe({
       next: (response: any) => {
         this.historyLoadInProgress = false;
-        const mergedCount = this.mergeHistoryResponse(response, window.minTime);
-        if (mergedCount > 0) {
-          this.onDataUpdated();
-        }
+        this.mergeHistoryResponse(response, window.minTime);
       },
       error: () => {
         this.historyLoadInProgress = false;
       }
     });
+  }
+
+  private isHistoryBackfillEnabled(): boolean {
+    const enabled = this.ctx?.settings?.enableHistoryBackfill;
+    return enabled === true || enabled === 'true';
+  }
+
+  private resolveHistoryBackfillCooldownMs(): number {
+    const configuredMs = Number(this.ctx?.settings?.historyBackfillCooldownMs);
+    if (Number.isFinite(configuredMs) && configuredMs >= 500) {
+      return configuredMs;
+    }
+    return 5000;
+  }
+
+  private isSortedByTimestamp(points: Array<any>): boolean {
+    if (!points || points.length < 2) {
+      return true;
+    }
+    for (let i = 1; i < points.length; i++) {
+      const prev = Number(points[i - 1]?.[0]);
+      const curr = Number(points[i]?.[0]);
+      if (Number.isFinite(prev) && Number.isFinite(curr) && prev > curr) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private findEarliestTs(dataEntries: Array<{ data: Array<[number, any]> }>): number | null {
@@ -678,6 +722,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   }
 
   private setupXAxis(): XAXisOption {
+    const activeTimeWindow = this.getActiveTimeWindow();
+    const now = Date.now();
     return {
       id: 'xAxis',
       mainType: 'xAxis',
@@ -687,8 +733,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       name: '',
       offset: 0,
       nameLocation: 'middle',
-      max:  this.ctx.defaultSubscription.timeWindow.maxTime,
-      min:  this.ctx.defaultSubscription.timeWindow.minTime,
+      max: activeTimeWindow?.maxTime ?? now,
+      min: activeTimeWindow?.minTime ?? (now - 24 * 60 * 60 * 1000),
       nameTextStyle: {
         color: 'rgba(0, 0, 0, 0.54)',
         fontStyle: 'normal',

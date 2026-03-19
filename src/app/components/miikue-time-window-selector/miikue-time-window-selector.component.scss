@@ -4,6 +4,8 @@
 :host {
   display: inline-block;
   font-family: 'Roboto', sans-serif;
+  position: relative;
+  z-index: 5;
 }
 .calendar-container{
   width: 300px;
@@ -30,28 +32,30 @@
     fill: #555;
   }
 }
-.popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.3);
-  z-index: 1040;
-}
-
 .popup-container {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.popup-surface {
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-  z-index: 1041;
-  
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  width: min(1040px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+
   .popup-content {
     display: flex;
+    align-items: stretch;
+    min-width: max-content;
   }
 
   .quick-selections {
@@ -93,13 +97,29 @@
     display: flex;
     gap: 24px;
     padding: 20px;
+    align-items: flex-start;
+    flex: 0 0 auto;
+
+    .calendar-container {
+      flex: 0 0 300px;
+      min-width: 280px;
+      min-height: 320px;
+    }
+
+    .calendar-container mat-calendar {
+      display: block;
+      visibility: visible;
+      opacity: 1;
+      min-width: 280px;
+    }
 
     .time-and-actions {
       display: flex;
       flex-direction: column;
       justify-content: center;
       gap: 20px;
-      width: 140px;
+      flex: 0 0 180px;
+      width: 180px;
       padding-top: 10px;
 
       .form-group.time-inputs {
@@ -110,6 +130,11 @@
         .input-group {
             display: flex;
             justify-content: center;
+        }
+
+        app-miikue-time-input {
+          display: block;
+          width: 100%;
         }
       }
 
@@ -137,6 +162,40 @@
             &:hover { background-color: #344495; }
           }
         }
+      }
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .popup-surface {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+
+    .popup-content {
+      min-width: 0;
+      flex-direction: column;
+    }
+
+    .quick-selections {
+      max-height: 220px;
+      border-right: none;
+      border-bottom: 1px solid #eee;
+    }
+
+    .custom-selection {
+      flex-direction: column;
+      gap: 12px;
+
+      .calendar-container {
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+      }
+
+      .time-and-actions {
+        flex: 0 0 auto;
+        width: 100%;
       }
     }
   }

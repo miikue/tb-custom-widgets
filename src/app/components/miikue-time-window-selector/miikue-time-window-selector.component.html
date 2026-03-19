@@ -1,53 +1,53 @@
-<div class="time-window-selector" (click)="$event.stopPropagation()">
-  <button class="display-button" (click)="togglePopup($event)">
+<div class="time-window-selector" (click)="$event.stopPropagation()" (pointerdown)="onRootPointerDown($event)">
+  <button class="display-button" (mousedown)="onTriggerMouseDown($event)" (click)="togglePopup($event)">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
       <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z" clip-rule="evenodd" />
     </svg>
     <span>{{ currentSelectionText }}</span>
   </button>
 
-  <div class="popup-overlay" *ngIf="isPopupOpen" (click)="closePopup()"></div>
-
-  <div class="popup-container" *ngIf="isPopupOpen">
-    <div class="popup-content">
-      <div class="quick-selections">
-        <ng-container *ngIf="showSubDaySelections">
-            <button (click)="selectQuickRange('hour')">Poslední hodina</button>
-            <button (click)="selectQuickRange('2h')">Poslední 2 hodiny</button>
-            <button (click)="selectQuickRange('6hours')">Posledních 6 hodin</button>
-            <button (click)="selectQuickRange('12h')">Posledních 12 hodin</button>
-        </ng-container>
-        <button (click)="selectQuickRange('day')">Posledních 24 hodin</button>
-        <button (click)="selectQuickRange('week')">Posledních 7 dní</button>
-        <button (click)="selectQuickRange('month')">Poslední měsíc</button>
-        <button (click)="selectQuickRange('2m')">Poslední 2 měsíce</button>
-        <button (click)="selectQuickRange('3m')">Poslední 3 měsíce</button>
-        <button (click)="selectQuickRange('6m')">Posledních 6 měsíců</button>
-        <button (click)="selectQuickRange('1y')">Poslední rok</button>
-      </div>
-      <div class="custom-selection">
-        <div class="calendar-container">
-            <mat-calendar 
-                [selected]="selectedRangeValue"
-                (selectedChange)="selectedChange($event)">
-            </mat-calendar>
+  <div #popupContainer class="popup-container" [style.display]="isPopupOpen ? 'flex' : 'none'" (click)="closePopup()">
+    <div class="popup-surface" (click)="$event.stopPropagation()">
+      <div class="popup-content">
+        <div class="quick-selections">
+          <ng-container *ngIf="showSubDaySelections">
+              <button (click)="selectQuickRange('hour')">Poslední hodina</button>
+              <button (click)="selectQuickRange('2h')">Poslední 2 hodiny</button>
+              <button (click)="selectQuickRange('6hours')">Posledních 6 hodin</button>
+              <button (click)="selectQuickRange('12h')">Posledních 12 hodin</button>
+          </ng-container>
+          <button (click)="selectQuickRange('day')">Posledních 24 hodin</button>
+          <button (click)="selectQuickRange('week')">Posledních 7 dní</button>
+          <button (click)="selectQuickRange('month')">Poslední měsíc</button>
+          <button (click)="selectQuickRange('2m')">Poslední 2 měsíce</button>
+          <button (click)="selectQuickRange('3m')">Poslední 3 měsíce</button>
+          <button (click)="selectQuickRange('6m')">Posledních 6 měsíců</button>
+          <button (click)="selectQuickRange('1y')">Poslední rok</button>
         </div>
-        <div class="time-and-actions">
-            
-            <div class="form-group time-inputs">
-              <div class="input-group">
-                <app-miikue-time-input [(ngModel)]="customStartTime" title="Čas začátku"></app-miikue-time-input>
+        <div class="custom-selection">
+          <div class="calendar-container">
+              <mat-calendar 
+                  [selected]="selectedRangeValue"
+                  (selectedChange)="selectedChange($event)">
+              </mat-calendar>
+          </div>
+          <div class="time-and-actions">
+              
+              <div class="form-group time-inputs">
+                <div class="input-group">
+                  <app-miikue-time-input [(ngModel)]="customStartTime" title="Čas začátku"></app-miikue-time-input>
+                </div>
               </div>
-            </div>
-            <div class="form-group time-inputs">
-              <div class="input-group">
-                <app-miikue-time-input [(ngModel)]="customEndTime" title="Čas konce"></app-miikue-time-input>
+              <div class="form-group time-inputs">
+                <div class="input-group">
+                  <app-miikue-time-input [(ngModel)]="customEndTime" title="Čas konce"></app-miikue-time-input>
+                </div>
               </div>
-            </div>
 
-            <div class="actions">
-              <button class="apply-btn" (click)="applyCustomRange()">Použít</button>
-            </div>
+              <div class="actions">
+                <button class="apply-btn" (click)="applyCustomRange()">Použít</button>
+              </div>
+          </div>
         </div>
       </div>
     </div>

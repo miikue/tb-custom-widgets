@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnChanges, SimpleChanges, ChangeDetectorRef, ElementRef, ViewEncapsulation, output } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, OnChanges, OnDestroy, SimpleChanges, ChangeDetectorRef, ViewChild, ViewEncapsulation, output } from '@angular/core';
 import { DateRange, MatRangeDateSelectionModel, DefaultMatCalendarRangeStrategy } from '@angular/material/datepicker';
 
 export interface TimeWindow {
@@ -16,7 +16,8 @@ export interface TimeWindow {
     DefaultMatCalendarRangeStrategy
   ],
 })
-export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
+export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnDestroy {
+  @ViewChild('popupContainer', { static: false }) popupContainer: ElementRef<HTMLDivElement>;
 
   @Input() initialTimeWindow: TimeWindow;
   @Input() showQuickSelections = true;
@@ -34,8 +35,9 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
 
   selectedRangeValue: DateRange<Date | null> = new DateRange(null, null);
 
+  private uiDebugEnabled = true;
+
   constructor(
-    private el: ElementRef,
     private cd: ChangeDetectorRef,
     private readonly selectionModel: MatRangeDateSelectionModel<Date>,
     private readonly selectionStrategy: DefaultMatCalendarRangeStrategy<Date>,
@@ -82,13 +84,47 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
 
   togglePopup(event?: MouseEvent) {
     if (event) event.stopPropagation();
-    this.isPopupOpen = !this.isPopupOpen;
+    if (this.uiDebugEnabled) {
+      console.warn('[TW UI] togglePopup click', {
+        eventType: event?.type,
+        target: (event?.target as HTMLElement)?.tagName,
+        isPopupOpenBefore: this.isPopupOpen
+      });
+    }
     if (this.isPopupOpen) {
-        const initial = this.initialTimeWindow || this.calculateInitialWindow();
-        this.updateStateFromTimeWindow(initial);
+      this.closePopup();
+    } else {
+      const initial = this.initialTimeWindow || this.calculateInitialWindow();
+      this.updateStateFromTimeWindow(initial);
+      this.isPopupOpen = true;
+      setTimeout(() => this.mountPopupToBody());
+    }
+    if (this.uiDebugEnabled) {
+      console.warn('[TW UI] popup state changed', { isPopupOpenAfter: this.isPopupOpen });
     }
   }
-  
+
+  onTriggerMouseDown(event: MouseEvent): void {
+    if (this.uiDebugEnabled) {
+      console.warn('[TW UI] trigger mousedown', {
+        button: event.button,
+        x: event.clientX,
+        y: event.clientY
+      });
+    }
+  }
+
+  onRootPointerDown(event: PointerEvent): void {
+    if (this.uiDebugEnabled) {
+      console.warn('[TW UI] root pointerdown', {
+        target: (event.target as HTMLElement)?.tagName,
+        x: event.clientX,
+        y: event.clientY
+      });
+    }
+  }
+
+
   private calculateInitialWindow(): TimeWindow {
       const endTs = new Date().getTime();
       const startTs = endTs - 24 * 60 * 60 * 1000;
@@ -172,7 +208,23 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
   }
   
   closePopup() {
+    if (this.uiDebugEnabled) {
+      console.warn('[TW UI] closePopup');
+    }
     this.isPopupOpen = false;
+  }
+
+  private mountPopupToBody(): void {
+    const popupEl = this.popupContainer?.nativeElement;
+    if (!popupEl) {
+      return;
+    }
+
+    if (popupEl.parentNode !== document.body) {
+      document.body.appendChild(popupEl);
+    }
+
+    this.cd.detectChanges();
   }
 
   private updateDisplay(timeWindow: TimeWindow, label?: string) {
@@ -189,5 +241,12 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
 
   private formatTime(date: Date): string {
     return date.toTimeString().split(' ')[0].substring(0, 5);
+  }
+
+  ngOnDestroy(): void {
+    const popupEl = this.popupContainer?.nativeElement;
+    if (popupEl && popupEl.parentNode === document.body) {
+      document.body.removeChild(popupEl);
+    }
   }
 }

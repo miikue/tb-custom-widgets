@@ -19,12 +19,15 @@ $maxLegendHeight: 35%;
   width: 100%;
   height: 100%;
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 12px;
 
   .tb-time-series-chart-controls {
+    position: relative;
+    z-index: 3;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -47,20 +50,21 @@ $maxLegendHeight: 35%;
     }
   }
 
-  > div:not(.tb-time-series-chart-overlay) {
-    z-index: 1;
-  }
   .tb-time-series-chart-overlay {
     position: absolute;
     top: 12px;
     left: 12px;
     bottom: 12px;
     right: 12px;
+    z-index: 1;
+    pointer-events: none;
   }
   div.tb-widget-title {
     padding: 0;
   }
   .tb-time-series-chart-content {
+    position: relative;
+    z-index: 2;
     flex: 1;
     min-width: 0;
     min-height: 0;
