@@ -1,5 +1,4 @@
-import { Component, ElementRef, Input, OnInit, OnChanges, OnDestroy, SimpleChanges, ChangeDetectorRef, ViewChild, ViewEncapsulation, output } from '@angular/core';
-import { DateRange, MatRangeDateSelectionModel, DefaultMatCalendarRangeStrategy } from '@angular/material/datepicker';
+import { Component, Input, OnInit, OnChanges, SimpleChanges, ChangeDetectorRef, ViewEncapsulation, output } from '@angular/core';
 
 export interface TimeWindow {
   startTs: number;
@@ -10,19 +9,11 @@ export interface TimeWindow {
   selector: 'app-miikue-time-window-selector',
   templateUrl: './miikue-time-window-selector.component.html',
   styleUrls: ['./miikue-time-window-selector.component.scss'],
-  encapsulation: ViewEncapsulation.None,
-  providers: [
-    MatRangeDateSelectionModel,
-    DefaultMatCalendarRangeStrategy
-  ],
+  encapsulation: ViewEncapsulation.None
 })
-export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnDestroy {
-  @ViewChild('popupContainer', { static: false }) popupContainer: ElementRef<HTMLDivElement>;
+export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
 
   @Input() initialTimeWindow: TimeWindow;
-  @Input() showQuickSelections = true;
-  @Input() showTimeSelection = true;
-  @Input() showSubDaySelections = true;
   
   // New Signal-based output
   timeWindowChange = output<TimeWindow>();
@@ -30,17 +21,15 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
   isPopupOpen = false;
   currentSelectionText = 'Posledních 24 hodin';
   
+  customStartDate: string;
+  customEndDate: string;
   customStartTime: string;
   customEndTime: string;
-
-  selectedRangeValue: DateRange<Date | null> = new DateRange(null, null);
 
   private uiDebugEnabled = true;
 
   constructor(
-    private cd: ChangeDetectorRef,
-    private readonly selectionModel: MatRangeDateSelectionModel<Date>,
-    private readonly selectionStrategy: DefaultMatCalendarRangeStrategy<Date>,
+    private cd: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -64,10 +53,12 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
     if (!timeWindow || typeof timeWindow.startTs !== 'number' || typeof timeWindow.endTs !== 'number') {
       return;
     }
-    this.selectedRangeValue = new DateRange(new Date(timeWindow.startTs), new Date(timeWindow.endTs));
-    this.selectionModel.updateSelection(this.selectedRangeValue, this);
-    this.customStartTime = this.formatTime(new Date(timeWindow.startTs));
-    this.customEndTime = this.formatTime(new Date(timeWindow.endTs));
+    const startDate = new Date(timeWindow.startTs);
+    const endDate = new Date(timeWindow.endTs);
+    this.customStartDate = this.formatDateForInput(startDate);
+    this.customEndDate = this.formatDateForInput(endDate);
+    this.customStartTime = this.formatTime(startDate);
+    this.customEndTime = this.formatTime(endDate);
     const quickRangeLabel = useLabel ? this.getQuickRangeLabel(timeWindow) : null;
     this.updateDisplay(timeWindow, quickRangeLabel);
   }
@@ -97,7 +88,6 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
       const initial = this.initialTimeWindow || this.calculateInitialWindow();
       this.updateStateFromTimeWindow(initial);
       this.isPopupOpen = true;
-      setTimeout(() => this.mountPopupToBody());
     }
     if (this.uiDebugEnabled) {
       console.warn('[TW UI] popup state changed', { isPopupOpenAfter: this.isPopupOpen });
@@ -130,18 +120,6 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
       const startTs = endTs - 24 * 60 * 60 * 1000;
       return { startTs, endTs };
   }
-
-  selectedChange(date: Date | null): void {
-    if (!date) return;
-    const selection = this.selectionModel.selection;
-    const newSelection = this.selectionStrategy.selectionFinished(date, selection);
-    this.selectionModel.updateSelection(newSelection, this);
-    this.selectedRangeValue = new DateRange(newSelection.start, newSelection.end);
-    if (!this.showTimeSelection && newSelection.start && newSelection.end) {
-      this.applyCustomRange();
-    }
-  }
-
   selectQuickRange(type: 'hour' | '2h' | '6hours' | '12h' | 'day' | 'week' | 'month' | '2m' | '3m' | '6m' | '1y', emitChange = true) {
     const endTs = new Date().getTime();
     const startDate = new Date();
@@ -167,29 +145,23 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
       this.timeWindowChange.emit(newTimeWindow);
     }
     this.updateStateFromTimeWindow(newTimeWindow);
-    this.isPopupOpen = false;
+    // Keep popup open so user can fine-tune date/time fields after quick selection.
+    this.cd.detectChanges();
   }
 
   applyCustomRange() {
-    const { start, end } = this.selectedRangeValue;
-    if (!start || !end) {
-      alert('Prosím, dokončete výběr rozsahu v kalendáři.');
+    if (!this.customStartDate || !this.customEndDate) {
+      alert('Prosím, vyberte datum Od/Do.');
       return;
     }
-    let finalStartDate: Date, finalEndDate: Date;
-    if (this.showTimeSelection) {
-      if (!this.customStartTime || !this.customEndTime) {
-        alert('Prosím, vyplňte časy.');
-        return;
-      }
-      finalStartDate = this.combineDateAndTime(start, this.customStartTime);
-      finalEndDate = this.combineDateAndTime(end, this.customEndTime);
-    } else {
-      finalStartDate = new Date(start);
-      finalStartDate.setHours(0, 0, 0, 0);
-      finalEndDate = new Date(end);
-      finalEndDate.setHours(23, 59, 59, 999);
-    }
+
+    let finalStartDate: Date;
+    let finalEndDate: Date;
+
+    const startTime = this.customStartTime || '00:00';
+    const endTime = this.customEndTime || '23:59';
+    finalStartDate = this.combineDateAndTime(this.customStartDate, startTime);
+    finalEndDate = this.combineDateAndTime(this.customEndDate, endTime);
     if (finalStartDate.getTime() < finalEndDate.getTime()) {
       const newTimeWindow = { startTs: finalStartDate.getTime(), endTs: finalEndDate.getTime() };
       this.timeWindowChange.emit(newTimeWindow);
@@ -200,9 +172,10 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
     }
   }
   
-  private combineDateAndTime(date: Date, time: string): Date {
+  private combineDateAndTime(date: string, time: string): Date {
       const [hours, minutes] = time.split(':').map(Number);
-      const newDate = new Date(date);
+      const [year, month, day] = date.split('-').map(Number);
+      const newDate = new Date(year, month - 1, day);
       newDate.setHours(hours, minutes, 0, 0);
       return newDate;
   }
@@ -212,19 +185,6 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
       console.warn('[TW UI] closePopup');
     }
     this.isPopupOpen = false;
-  }
-
-  private mountPopupToBody(): void {
-    const popupEl = this.popupContainer?.nativeElement;
-    if (!popupEl) {
-      return;
-    }
-
-    if (popupEl.parentNode !== document.body) {
-      document.body.appendChild(popupEl);
-    }
-
-    this.cd.detectChanges();
   }
 
   private updateDisplay(timeWindow: TimeWindow, label?: string) {
@@ -243,10 +203,10 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
     return date.toTimeString().split(' ')[0].substring(0, 5);
   }
 
-  ngOnDestroy(): void {
-    const popupEl = this.popupContainer?.nativeElement;
-    if (popupEl && popupEl.parentNode === document.body) {
-      document.body.removeChild(popupEl);
-    }
+  private formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 }

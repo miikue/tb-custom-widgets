@@ -20,6 +20,7 @@ import {
   MarkLineComponent,
   PolarComponent,
   RadarComponent,
+  ToolboxComponent,
   TooltipComponent,
   VisualMapComponent
 } from 'echarts/components';
@@ -62,6 +63,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   private historyLoadInProgress = false;
   private historyWindowSignature = '';
   private lastHistoryRequestTs = 0;
+  private readonly minAggregateThresholdMs = 2 * 60 * 60 * 1000;
+  private readonly halfHourAggregateThresholdMs = 30 * 24 * 60 * 60 * 1000;
 
   private valueFormatter: ValueFormatProcessor;
 
@@ -97,11 +100,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     this.ctx?.timewindowFunctions?.onUpdateTimewindow(newTimeWindow.startTs, newTimeWindow.endTs);
   }
 
-  public resetTimeWindow(): void {
-    this.ctx?.timewindowFunctions?.onResetTimewindow();
-    this.syncCurrentTimeWindowFromSubscription();
-  }
-
   ngAfterViewInit(): void {
     this.initChart();
   }
@@ -119,6 +117,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       formatter: (params: CallbackDataParams[]) => this.setupTooltipElement(params),
       backgroundColor: "transparent",
       darkMode: false,
+      toolbox: this.setupToolbox(),
       tooltip: {
         show: true,
         trigger: 'axis',
@@ -341,12 +340,15 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       return;
     }
 
+    const durationMs = Math.max(0, (window.maxTime || 0) - (window.minTime || 0));
+    const keyPlan = this.buildTelemetryKeyPlan(keyNames, durationMs);
+
     const earliestTs = this.findEarliestTs(dataEntries);
     if (!isDefinedAndNotNull(earliestTs)) {
       return;
     }
 
-    const signature = `${entityType}|${entityId}|${window.minTime}|${window.maxTime}|${keyNames.join(',')}`;
+    const signature = `${entityType}|${entityId}|${window.minTime}|${window.maxTime}|${keyPlan.queryKeys.join(',')}`;
     if (signature !== this.historyWindowSignature) {
       this.historyWindowSignature = signature;
       this.historyLoadInProgress = false;
@@ -359,7 +361,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     const batchMs = 7 * 24 * 60 * 60 * 1000;
     const endTs = earliestTs - 1;
     const startTs = Math.max(window.minTime, endTs - batchMs + 1);
-    const keysQuery = encodeURIComponent(keyNames.join(','));
+    const keysQuery = encodeURIComponent(keyPlan.queryKeys.join(','));
     const url = `/api/plugins/telemetry/${entityType}/${entityId}/values/timeseries` +
       `?keys=${keysQuery}` +
       `&startTs=${startTs}` +
@@ -373,12 +375,46 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     this.http.get(url).subscribe({
       next: (response: any) => {
         this.historyLoadInProgress = false;
-        this.mergeHistoryResponse(response, window.minTime);
+        this.mergeHistoryResponse(response, window.minTime, keyPlan.responseKeyToBaseKey);
       },
       error: () => {
         this.historyLoadInProgress = false;
       }
     });
+  }
+
+  private buildTelemetryKeyPlan(baseKeyNames: string[], durationMs: number): {
+    queryKeys: string[],
+    responseKeyToBaseKey: Record<string, string>
+  } {
+    const queryKeySet = new Set<string>();
+    const responseKeyToBaseKey: Record<string, string> = {};
+
+    for (const baseKey of baseKeyNames) {
+      if (!baseKey) {
+        continue;
+      }
+
+      queryKeySet.add(baseKey);
+      responseKeyToBaseKey[baseKey] = baseKey;
+
+      if (durationMs > this.minAggregateThresholdMs) {
+        const minKey = `${baseKey}_min`;
+        queryKeySet.add(minKey);
+        responseKeyToBaseKey[minKey] = baseKey;
+      }
+
+      if (durationMs > this.halfHourAggregateThresholdMs) {
+        const halfHourKey = `${baseKey}_30min`;
+        queryKeySet.add(halfHourKey);
+        responseKeyToBaseKey[halfHourKey] = baseKey;
+      }
+    }
+
+    return {
+      queryKeys: Array.from(queryKeySet),
+      responseKeyToBaseKey
+    };
   }
 
   private isHistoryBackfillEnabled(): boolean {
@@ -432,9 +468,22 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     return earliest;
   }
 
-  private mergeHistoryResponse(response: any, minTime: number): number {
+  private mergeHistoryResponse(response: any, minTime: number, responseKeyToBaseKey: Record<string, string>): number {
     if (!response || typeof response !== 'object') {
       return 0;
+    }
+
+    const groupedHistory: Record<string, Array<any>> = {};
+    for (const responseKey of Object.keys(response)) {
+      const baseKey = responseKeyToBaseKey?.[responseKey] || responseKey;
+      const items = Array.isArray(response[responseKey]) ? response[responseKey] : [];
+      if (!items.length) {
+        continue;
+      }
+      if (!groupedHistory[baseKey]) {
+        groupedHistory[baseKey] = [];
+      }
+      groupedHistory[baseKey].push(...items);
     }
 
     let mergedPoints = 0;
@@ -445,7 +494,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
         continue;
       }
 
-      const historyItems = Array.isArray(response[seriesKeyName]) ? response[seriesKeyName] : [];
+      const historyItems = Array.isArray(groupedHistory[seriesKeyName]) ? groupedHistory[seriesKeyName] : [];
       if (!historyItems.length) {
         continue;
       }
@@ -493,12 +542,36 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     return [ts, point[1]];
   }
 
+  private setupToolbox(): EChartsOption['toolbox'] {
+    if (this.ctx?.settings?.showToolbox === false) {
+      return { show: false };
+    }
+
+    return {
+      show: true,
+      right: 8,
+      top: 8,
+      itemSize: 16,
+      feature: {
+        dataZoom: {
+          yAxisIndex: 'none'
+        },
+        saveAsImage: {
+          pixelRatio: 2,
+          backgroundColor: '#ffffff',
+          name: 'miikue-chart-line'
+        }
+      }
+    };
+  }
+
   private initEchart(): void {
     echarts.use([
       TooltipComponent,
       GridComponent,
       VisualMapComponent,
       DataZoomComponent,
+      ToolboxComponent,
       MarkLineComponent,
       PolarComponent,
       RadarComponent,

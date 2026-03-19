@@ -6,11 +6,8 @@
   <div class="tb-time-series-chart-controls" *ngIf="currentTimeWindow">
     <app-miikue-time-window-selector
       [initialTimeWindow]="currentTimeWindow"
-      (timeWindowChange)="onTimeWindowChange($event)"
-      [showTimeSelection]="true"
-      [showQuickSelections]="true">
+      (timeWindowChange)="onTimeWindowChange($event)">
     </app-miikue-time-window-selector>
-    <button class="tb-time-series-chart-reset-btn" type="button" (click)="resetTimeWindow()">Odzoom</button>
   </div>
   <div class="tb-time-series-chart-content" [class]="legendClass">
     <div #echartContainer class="tb-time-series-chart-shape"></div>

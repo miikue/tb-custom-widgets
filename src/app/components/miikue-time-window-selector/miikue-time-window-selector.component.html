@@ -10,12 +10,10 @@
     <div class="popup-surface" (click)="$event.stopPropagation()">
       <div class="popup-content">
         <div class="quick-selections">
-          <ng-container *ngIf="showSubDaySelections">
-              <button (click)="selectQuickRange('hour')">Poslední hodina</button>
-              <button (click)="selectQuickRange('2h')">Poslední 2 hodiny</button>
-              <button (click)="selectQuickRange('6hours')">Posledních 6 hodin</button>
-              <button (click)="selectQuickRange('12h')">Posledních 12 hodin</button>
-          </ng-container>
+          <button (click)="selectQuickRange('hour')">Poslední hodina</button>
+          <button (click)="selectQuickRange('2h')">Poslední 2 hodiny</button>
+          <button (click)="selectQuickRange('6hours')">Posledních 6 hodin</button>
+          <button (click)="selectQuickRange('12h')">Posledních 12 hodin</button>
           <button (click)="selectQuickRange('day')">Posledních 24 hodin</button>
           <button (click)="selectQuickRange('week')">Posledních 7 dní</button>
           <button (click)="selectQuickRange('month')">Poslední měsíc</button>
@@ -26,21 +24,27 @@
         </div>
         <div class="custom-selection">
           <div class="calendar-container">
-              <mat-calendar 
-                  [selected]="selectedRangeValue"
-                  (selectedChange)="selectedChange($event)">
-              </mat-calendar>
+            <div class="form-group date-inputs">
+              <label for="tw-start-date">Datum od</label>
+              <input id="tw-start-date" type="date" class="datetime-input" [(ngModel)]="customStartDate">
+            </div>
+            <div class="form-group date-inputs">
+              <label for="tw-end-date">Datum do</label>
+              <input id="tw-end-date" type="date" class="datetime-input" [(ngModel)]="customEndDate">
+            </div>
           </div>
           <div class="time-and-actions">
               
               <div class="form-group time-inputs">
+                <label for="tw-start-time">Čas začátku</label>
                 <div class="input-group">
-                  <app-miikue-time-input [(ngModel)]="customStartTime" title="Čas začátku"></app-miikue-time-input>
+                  <input id="tw-start-time" type="time" class="datetime-input" [(ngModel)]="customStartTime">
                 </div>
               </div>
               <div class="form-group time-inputs">
+                <label for="tw-end-time">Čas konce</label>
                 <div class="input-group">
-                  <app-miikue-time-input [(ngModel)]="customEndTime" title="Čas konce"></app-miikue-time-input>
+                  <input id="tw-end-time" type="time" class="datetime-input" [(ngModel)]="customEndTime">
                 </div>
               </div>
 

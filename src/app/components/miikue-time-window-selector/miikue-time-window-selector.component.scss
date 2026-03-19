@@ -48,14 +48,15 @@
   border-radius: 8px;
   box-shadow: 0 8px 25px rgba(0,0,0,0.2);
   border: 1px solid rgba(15, 23, 42, 0.16);
-  width: min(1040px, calc(100vw - 24px));
+  width: min(1100px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
   overflow: auto;
 
   .popup-content {
-    display: flex;
+    display: grid;
+    grid-template-columns: 240px 1fr;
     align-items: stretch;
-    min-width: max-content;
+    min-width: 900px;
   }
 
   .quick-selections {
@@ -65,7 +66,7 @@
     border-right: 1px solid #eee;
     padding: 20px;
     background-color: #f8f9fa;
-    max-height: 350px; // Max height to enable vertical scroll
+    max-height: 540px;
     overflow-y: auto; // Enable vertical scroll
 
     /* Hide scrollbar for cleaner look */
@@ -94,23 +95,25 @@
   }
 
   .custom-selection {
-    display: flex;
+    display: grid;
+    grid-template-columns: 320px 200px;
     gap: 24px;
     padding: 20px;
     align-items: flex-start;
-    flex: 0 0 auto;
+    min-width: 0;
 
     .calendar-container {
-      flex: 0 0 300px;
-      min-width: 280px;
+      width: 320px;
+      min-width: 320px;
       min-height: 320px;
-    }
+      overflow: visible;
 
-    .calendar-container mat-calendar {
-      display: block;
-      visibility: visible;
-      opacity: 1;
-      min-width: 280px;
+      .date-inputs {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
     }
 
     .time-and-actions {
@@ -118,8 +121,8 @@
       flex-direction: column;
       justify-content: center;
       gap: 20px;
-      flex: 0 0 180px;
-      width: 180px;
+      width: 200px;
+      min-width: 200px;
       padding-top: 10px;
 
       .form-group.time-inputs {
@@ -164,6 +167,29 @@
         }
       }
     }
+
+    .form-group label {
+      font-size: 13px;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .datetime-input {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 14px;
+      background: #fff;
+      color: #0f172a;
+    }
+
+    .datetime-input:focus {
+      outline: none;
+      border-color: #64748b;
+      box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.15);
+    }
   }
 }
 
@@ -174,7 +200,8 @@
 
     .popup-content {
       min-width: 0;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1fr;
     }
 
     .quick-selections {
@@ -184,18 +211,19 @@
     }
 
     .custom-selection {
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1fr;
       gap: 12px;
 
       .calendar-container {
-        flex: 0 0 auto;
         width: 100%;
         min-width: 0;
+        min-height: 0;
       }
 
       .time-and-actions {
-        flex: 0 0 auto;
         width: 100%;
+        min-width: 0;
       }
     }
   }
