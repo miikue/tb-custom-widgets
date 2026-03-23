@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   Input,
+  OnDestroy,
   OnInit,
   Renderer2,
   SecurityContext,
@@ -30,7 +31,7 @@ import { LegendConfig, LegendData, LegendKey, ValueFormatProcessor, WidgetTimewi
 import { CallbackDataParams, XAXisOption, YAXisOption } from 'echarts/types/dist/shared';
 import { WidgetComponent } from '@home/components/widget/widget.component';
 import { DomSanitizer } from '@angular/platform-browser';
-import { isDefinedAndNotNull } from '@core/public-api';
+import { isDefinedAndNotNull, WidgetSubscriptionOptions } from '@core/public-api';
 import { calculateAxisSize, measureAxisNameSize } from '@home/components/public-api';
 import { ECharts } from '@home/components/widget/lib/chart/echarts-widget.models';
 import { TimeWindow } from '../miikue-time-window-selector/miikue-time-window-selector.component';
@@ -41,7 +42,7 @@ import { TimeWindow } from '../miikue-time-window-selector/miikue-time-window-se
   styleUrls: ['./miikue-chart-line.component.scss'],
   standalone: false
 })
-export class MiikueChartLineComponent implements OnInit, AfterViewInit {
+export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('echartContainer', {static: false}) echartContainer: ElementRef<HTMLElement>;
 
@@ -65,6 +66,9 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   private lastHistoryRequestTs = 0;
   private readonly minAggregateThresholdMs = 2 * 60 * 60 * 1000;
   private readonly halfHourAggregateThresholdMs = 30 * 24 * 60 * 60 * 1000;
+  private minSubscription: any;
+  private minSubscriptionData: Array<any> = [];
+  private minSubscriptionSignature = '';
 
   private valueFormatter: ValueFormatProcessor;
 
@@ -89,6 +93,12 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     this.prepareValueFormat();
     this.initEchart();
     this.initLegend();
+    this.ensureMinSubscription();
+  }
+
+  ngOnDestroy(): void {
+    this.shapeResize$?.disconnect();
+    this.destroyMinSubscription();
   }
 
   public onTimeWindowChange(newTimeWindow: TimeWindow): void {
@@ -170,8 +180,10 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     if (!this.myChart) {
       return;
     }
+    this.ensureMinSubscription();
     this.syncCurrentTimeWindowFromSubscription();
     const activeTimeWindow = this.getActiveTimeWindow();
+    const combinedDataEntries = this.getCombinedDataEntries();
     const newData = [];
     const maxGapMs = this.resolveMaxGapMs();
     this.onResize();
@@ -179,9 +191,9 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       this.updateXAxisTimeWindow(this.xAxis, activeTimeWindow);
     }
 
-    for (const key in this.ctx.data) {
+    for (const key in combinedDataEntries) {
       newData[key] = [];
-      const sourceData = this.ctx.data[key].data || [];
+      const sourceData = combinedDataEntries[key].data || [];
       const sortedData = this.isSortedByTimestamp(sourceData) ? sourceData : [...sourceData].sort((a, b) => a[0] - b[0]);
       let lastTs: number = null;
 
@@ -291,6 +303,190 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
       startTs: activeTimeWindow.minTime,
       endTs: activeTimeWindow.maxTime
     };
+  }
+
+  private ensureMinSubscription(): void {
+    const minSubscriptionConfig = this.buildMinSubscriptionConfig();
+    if (!minSubscriptionConfig) {
+      this.destroyMinSubscription();
+      return;
+    }
+
+    if (this.minSubscription && this.minSubscriptionSignature === minSubscriptionConfig.signature) {
+      return;
+    }
+
+    this.destroyMinSubscription();
+    this.minSubscriptionSignature = minSubscriptionConfig.signature;
+
+    const subscriptionType = this.resolveSubscriptionType();
+    if (!subscriptionType) {
+      this.destroyMinSubscription();
+      return;
+    }
+
+    const options: WidgetSubscriptionOptions = {
+      type: subscriptionType,
+      datasources: [minSubscriptionConfig.datasource],
+      callbacks: {
+        onDataUpdated: () => {
+          this.onMinSubscriptionDataUpdated();
+        }
+      }
+    } as WidgetSubscriptionOptions;
+
+    let createSubscriptionResult: any;
+    try {
+      createSubscriptionResult = this.ctx?.subscriptionApi?.createSubscription(options, true);
+    } catch (e) {
+      this.minSubscription = null;
+      this.minSubscriptionData = [];
+      this.minSubscriptionSignature = '';
+      return;
+    }
+
+    if (!createSubscriptionResult || typeof createSubscriptionResult.subscribe !== 'function') {
+      return;
+    }
+
+    createSubscriptionResult.subscribe({
+      next: (subscription: any) => {
+        this.minSubscription = subscription;
+        this.minSubscriptionData = this.normalizeSubscriptionData(subscription?.data, minSubscriptionConfig.baseKeyNames);
+        this.onDataUpdated();
+      },
+      error: () => {
+        this.minSubscription = null;
+        this.minSubscriptionData = [];
+      }
+    });
+  }
+
+  private onMinSubscriptionDataUpdated(): void {
+    this.minSubscriptionData = this.normalizeSubscriptionData(this.minSubscription?.data, this.getPrimarySeriesNames());
+    if (this.myChart) {
+      this.onDataUpdated();
+    }
+  }
+
+  private buildMinSubscriptionConfig(): { signature: string; datasource: any; baseKeyNames: string[] } | null {
+    const defaultDatasource = this.ctx?.defaultSubscription?.datasources?.[0] || this.ctx?.datasources?.[0];
+    if (!defaultDatasource) {
+      return null;
+    }
+
+    const runtimePrimaryKeys = (Object.values(this.ctx?.data || {}) as any[])
+      .map(entry => entry?.dataKey)
+      .filter(key => !!key?.name && !String(key.name).endsWith('_min'));
+    const datasourcePrimaryKeys = (Array.isArray(defaultDatasource?.dataKeys) ? defaultDatasource.dataKeys : [])
+      .filter(key => !!key?.name && !String(key.name).endsWith('_min'));
+    const primaryKeys = runtimePrimaryKeys.length ? runtimePrimaryKeys : datasourcePrimaryKeys;
+    if (!primaryKeys.length) {
+      return null;
+    }
+
+    const minDataKeys = primaryKeys.map((key) => ({
+      name: `${key.name}_min`,
+      label: `${key.label || key.name} min`,
+      type: key.type,
+      color: key.color,
+      units: key.units,
+      decimals: key.decimals,
+      pattern: key.pattern,
+      hidden: key.hidden,
+      settings: {
+        ...(key.settings || {})
+      }
+    }));
+
+    const normalizedMinDataKeys = minDataKeys
+      .filter((key) => !!key && !!key.name && !!key.type)
+      .map((key) => ({
+        ...key,
+        settings: key.settings || {}
+      }));
+    if (!normalizedMinDataKeys.length) {
+      return null;
+    }
+
+    const datasource = {
+      type: defaultDatasource.type,
+      name: defaultDatasource.name,
+      entityAliasId: defaultDatasource.entityAliasId,
+      entityName: defaultDatasource.entityName,
+      entityType: defaultDatasource.entityType,
+      entityId: defaultDatasource.entityId,
+      entityFilter: defaultDatasource.entityFilter,
+      dataKeys: normalizedMinDataKeys
+    };
+
+    const entityType = defaultDatasource?.entityType || '';
+    const entityId = defaultDatasource?.entityId || '';
+    const signature = `${entityType}|${entityId}|${normalizedMinDataKeys.map(key => key.name).join(',')}`;
+
+    return {
+      signature,
+      datasource,
+      baseKeyNames: primaryKeys.map(key => key.name)
+    };
+  }
+
+  private destroyMinSubscription(): void {
+    const activeSubscription = this.minSubscription;
+    this.minSubscription = null;
+    this.minSubscriptionData = [];
+    this.minSubscriptionSignature = '';
+
+    if (!activeSubscription) {
+      return;
+    }
+
+    if (typeof activeSubscription.unsubscribe === 'function') {
+      activeSubscription.unsubscribe();
+      return;
+    }
+
+    if (typeof this.ctx?.subscriptionApi?.removeSubscription === 'function') {
+      try {
+        this.ctx.subscriptionApi.removeSubscription(activeSubscription);
+      } catch (e) {
+        // Ignore cleanup errors to prevent widget runtime breaks.
+      }
+    }
+  }
+
+  private resolveSubscriptionType(): any {
+    return this.ctx?.defaultSubscription?.type || null;
+  }
+
+  private normalizeSubscriptionData(data: any, baseKeyNames: string[]): Array<any> {
+    const entries = Object.values(data || {}) as any[];
+    if (!entries.length) {
+      return [];
+    }
+
+    const allowedMinKeys = new Set((baseKeyNames || []).map(name => `${name}_min`));
+    return entries.filter((entry) => {
+      const keyName = entry?.dataKey?.name;
+      return !!keyName && allowedMinKeys.has(keyName);
+    });
+  }
+
+  private getPrimarySeriesNames(): string[] {
+    const entries = Object.values(this.ctx?.data || {}) as any[];
+    return entries
+      .map(entry => entry?.dataKey?.name)
+      .filter(name => !!name && !String(name).endsWith('_min'));
+  }
+
+  private getCombinedDataEntries(): Array<any> {
+    const baseEntries = Object.values(this.ctx?.data || {}) as any[];
+    const baseNames = new Set(baseEntries.map(entry => entry?.dataKey?.name).filter(name => !!name));
+    const minEntries = (this.minSubscriptionData || []).filter((entry) => {
+      const keyName = entry?.dataKey?.name;
+      return !!keyName && !baseNames.has(keyName);
+    });
+    return [...baseEntries, ...minEntries];
   }
 
   private resolveMaxGapMs(): number {
@@ -645,6 +841,9 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
   }
 
   private constructTooltipSeriesElement(param: CallbackDataParams, index: number): HTMLElement {
+    const combinedDataEntries = this.getCombinedDataEntries();
+    const seriesEntry = combinedDataEntries[index];
+
     const labelValueElement: HTMLElement = this.renderer.createElement('div');
     this.renderer.setStyle(labelValueElement, 'display', 'flex');
     this.renderer.setStyle(labelValueElement, 'flex-direction', 'row');
@@ -675,10 +874,10 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
     this.renderer.setStyle(labelTextElement, 'color', 'rgba(0, 0, 0, 0.76)');
     this.renderer.appendChild(labelElement, labelTextElement);
 
-    const decimals = isDefinedAndNotNull(this.ctx.data[index].dataKey.decimals) ?
-      this.ctx.data[index].dataKey.decimals : this.ctx.decimals;
-    const units = isDefinedAndNotNull(this.ctx.data[index].dataKey.units) ?
-      this.ctx.data[index].dataKey.units : this.ctx.units;
+    const decimals = isDefinedAndNotNull(seriesEntry?.dataKey?.decimals) ?
+      seriesEntry.dataKey.decimals : this.ctx.decimals;
+    const units = isDefinedAndNotNull(seriesEntry?.dataKey?.units) ?
+      seriesEntry.dataKey.units : this.ctx.units;
     const valueFormatter = ValueFormatProcessor.fromSettings(this.ctx.$injector, {units, decimals});
     const value = valueFormatter.format(param.value[1]);
 
@@ -723,10 +922,18 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
 
   private setupChartLines(): SeriesOption[] {
     const series: SeriesOption[] = [];
-    for (const [index, dataKey] of this.ctx.datasources[0].dataKeys.entries()) {
+    const combinedDataEntries = this.getCombinedDataEntries();
+    for (const [index, entry] of combinedDataEntries.entries()) {
+      const dataKey = entry?.dataKey;
+      if (!dataKey) {
+        continue;
+      }
+
+      const seriesName = dataKey.label || dataKey.name;
+      const isMinSeries = String(dataKey.name).endsWith('_min');
       series.push({
         id: index,
-        name: dataKey.label,
+        name: seriesName,
         type: 'line',
         connectNulls: false,
         showSymbol: false,
@@ -735,7 +942,9 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit {
         stackStrategy: 'all',
         data: [],
         lineStyle: {
-          color: dataKey.color
+          color: dataKey.color,
+          type: isMinSeries ? 'dashed' : 'solid',
+          opacity: isMinSeries ? 0.85 : 1
         },
         itemStyle: {
           color: dataKey.color
