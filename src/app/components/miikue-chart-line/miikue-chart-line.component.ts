@@ -48,7 +48,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
 
   @Input() ctx: WidgetContext;
 
-
   @Input() showSmallGraph: boolean = true;
   @Input() fullscreen: boolean = false;
   @Input() maxConnectedGapSeconds: number = 0;
@@ -244,16 +243,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
 
   public isLegendSeriesHidden(legendKey: LegendKey): boolean {
     return this.hiddenSeriesIndexes.has(legendKey.dataIndex);
-  }
-
-  public hasLegendStats(): boolean {
-    return !!(
-      this.legendConfig?.showMin ||
-      this.legendConfig?.showMax ||
-      this.legendConfig?.showAvg ||
-      this.legendConfig?.showTotal ||
-      this.legendConfig?.showLatest
-    );
   }
 
   private buildVisibleSeries(): SeriesOption[] {

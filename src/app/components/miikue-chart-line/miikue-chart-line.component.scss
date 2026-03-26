@@ -1,20 +1,5 @@
 $maxLegendWidth: 25%;
 $maxLegendHeight: 35%;
-
-    .tb-time-series-chart-shape {
-      flex: 1;
-      min-width: 0;
-      min-height: 0;
-      display: block; 
-      width: 100%;
-      height: 100%;
-      overflow: hidden; // Důležité, aby graf "nepřetékal" a nespouštěl scrollbary
-    }
-
-
-
-
-
 .tb-time-series-chart-panel {
   width: 100%;
   height: 100%;
@@ -144,35 +129,6 @@ $maxLegendHeight: 35%;
           align-items: center;
         }
       }
-      .tb-time-series-chart-legend-table {
-        border-spacing: 0;
-        table-layout: fixed;
-        &.vertical {
-          width: 100%;
-          table-layout: auto;
-          tbody {
-            th {
-              width: 95%;
-            }
-          }
-        }
-        th, td {
-          &:not(:last-child) {
-            padding-right: 16px;
-          }
-        }
-        thead tr, tbody tr:not(:last-child) {
-          th, td {
-            padding-bottom: 8px;
-          }
-        }
-        .tb-time-series-chart-legend-item {
-          align-items: flex-end;
-          &.left {
-            align-items: flex-start;
-          }
-        }
-      }
       .tb-time-series-chart-legend-item {
         display: flex;
         flex-direction: column;
@@ -203,17 +159,6 @@ $maxLegendHeight: 35%;
           }
         }
       }
-      .tb-time-series-chart-legend-type-label {
-        white-space: nowrap;
-        text-align: left;
-        &.right {
-          text-align: right;
-        }
-      }
-      .tb-time-series-chart-legend-value {
-        white-space: nowrap;
-        text-align: right;
-      }
     }
   }
 
@@ -223,10 +168,6 @@ $maxLegendHeight: 35%;
     font-weight: 500;
     letter-spacing: normal;
     line-height: 16px;
-
-    &.legend-row-color {
-      color: rgba(0, 0, 0, 0.38);
-    }
 
     &.legend-label-color {
       color: black;

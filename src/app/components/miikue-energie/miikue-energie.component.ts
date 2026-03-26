@@ -88,7 +88,7 @@ export class MiikueEnergieComponent implements OnInit, OnChanges {
   }
 
   public onTimeWindowChange(newTimeWindow: TimeWindow): void {
-      console.log('%c[Energie] onTimeWindowChange called with:', 'color: green; font-weight: bold;', newTimeWindow);
+      //console.log('%c[Energie] onTimeWindowChange called with:', 'color: green; font-weight: bold;', newTimeWindow);
       this.currentTimeWindow = newTimeWindow;
       this.fetchHistory();
   }
@@ -148,17 +148,17 @@ export class MiikueEnergieComponent implements OnInit, OnChanges {
   }
 
   public onDataUpdated(): void {
-      console.log('--- onDataUpdated called ---');
+      //console.log('--- onDataUpdated called ---');
       this.refreshData();
       
       const subDataKeysLength = this.ctx.defaultSubscription.dataKeys?.length || 0;
       const scopeDataLength = this.ctx.$scope.data?.length || 0;
       const hasDataKeys = subDataKeysLength > 0 || scopeDataLength > 0;
 
-      console.log(`Checking fetch condition: hasFetchedInitialData=${this.hasFetchedInitialData}, hasDataKeys=${hasDataKeys} (sub: ${subDataKeysLength}, scope: ${scopeDataLength})`);
+      //console.log(`Checking fetch condition: hasFetchedInitialData=${this.hasFetchedInitialData}, hasDataKeys=${hasDataKeys} (sub: ${subDataKeysLength}, scope: ${scopeDataLength})`);
 
       if (!this.hasFetchedInitialData && hasDataKeys) {
-          console.log("Condition met. Performing initial fetchHistory.");
+          //console.log("Condition met. Performing initial fetchHistory.");
           this.fetchHistory();
           this.hasFetchedInitialData = true;
       }
