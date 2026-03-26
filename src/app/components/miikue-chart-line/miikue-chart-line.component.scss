@@ -32,6 +32,37 @@ $maxLegendHeight: 35%;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+
+    .tb-data-mode-switcher {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .tb-data-mode-switcher-btn {
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      background: #fff;
+      color: rgba(0, 0, 0, 0.72);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1;
+      border-radius: 12px;
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: all .15s ease;
+
+      &:hover {
+        border-color: rgba(0, 0, 0, 0.38);
+        color: rgba(0, 0, 0, 0.9);
+      }
+
+      &.active {
+        background: #2c3e50;
+        border-color: #2c3e50;
+        color: #fff;
+      }
+    }
   }
 
   .tb-time-series-chart-overlay {

@@ -10,7 +10,6 @@ import {
   TemplateRef,
   ViewChild
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import * as echarts from 'echarts/core';
 import { EChartsOption, SeriesOption } from 'echarts';
 import { WidgetContext } from '@home/models/widget-component.models';
@@ -31,10 +30,11 @@ import { LegendConfig, LegendData, LegendKey, ValueFormatProcessor, WidgetTimewi
 import { CallbackDataParams, XAXisOption, YAXisOption } from 'echarts/types/dist/shared';
 import { WidgetComponent } from '@home/components/widget/widget.component';
 import { DomSanitizer } from '@angular/platform-browser';
-import { isDefinedAndNotNull, WidgetSubscriptionOptions } from '@core/public-api';
+import { isDefinedAndNotNull } from '@core/public-api';
 import { calculateAxisSize, measureAxisNameSize } from '@home/components/public-api';
 import { ECharts } from '@home/components/widget/lib/chart/echarts-widget.models';
-import { TimeWindow } from '../miikue-time-window-selector/miikue-time-window-selector.component';
+
+type DataDisplayMode = 'seconds' | 'min' | 'hour';
 
 @Component({
   selector: 'tb-miikue-chart-line',
@@ -61,14 +61,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   private option: EChartsOption;
   private latestSeriesData: any[][] = [];
   private hiddenSeriesIndexes = new Set<number>();
-  private historyLoadInProgress = false;
-  private historyWindowSignature = '';
-  private lastHistoryRequestTs = 0;
-  private readonly minAggregateThresholdMs = 2 * 60 * 60 * 1000;
-  private readonly halfHourAggregateThresholdMs = 30 * 24 * 60 * 60 * 1000;
-  private minSubscription: any;
-  private minSubscriptionData: Array<any> = [];
-  private minSubscriptionSignature = '';
 
   private valueFormatter: ValueFormatProcessor;
 
@@ -77,37 +69,44 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   public legendData: LegendData;
   public legendKeys: Array<LegendKey>;
   public showLegend: boolean;
-  public currentTimeWindow: TimeWindow;
+  public selectedDataDisplayMode: DataDisplayMode = 'seconds';
+  public readonly dataDisplayModes: Array<{ value: DataDisplayMode; label: string }> = [
+    { value: 'seconds', label: 'Sekundy' },
+    { value: 'min', label: 'Min agr' },
+    { value: 'hour', label: 'Hour agr' }
+  ];
 
   constructor(
     private renderer: Renderer2,
     private sanitizer: DomSanitizer,
-    private http: HttpClient,
     public widgetComponent: WidgetComponent,
   ) {}
 
   //Core logic
   ngOnInit(): void {
     this.ctx.$scope.miikueChartLineWidget = this;
-    this.syncCurrentTimeWindowFromSubscription();
+    this.selectedDataDisplayMode = this.resolveInitialDataDisplayMode();
     this.prepareValueFormat();
     this.initEchart();
     this.initLegend();
-    this.ensureMinSubscription();
   }
 
   ngOnDestroy(): void {
     this.shapeResize$?.disconnect();
-    this.destroyMinSubscription();
   }
 
-  public onTimeWindowChange(newTimeWindow: TimeWindow): void {
-    if (!newTimeWindow?.startTs || !newTimeWindow?.endTs) {
+  public onDataDisplayModeChange(mode: DataDisplayMode): void {
+    if (this.selectedDataDisplayMode === mode) {
       return;
     }
 
-    this.currentTimeWindow = newTimeWindow;
-    this.ctx?.timewindowFunctions?.onUpdateTimewindow(newTimeWindow.startTs, newTimeWindow.endTs);
+    this.selectedDataDisplayMode = mode;
+    this.hiddenSeriesIndexes.clear();
+    this.latestSeriesData = [];
+
+    if (this.myChart) {
+      this.onDataUpdated();
+    }
   }
 
   ngAfterViewInit(): void {
@@ -180,10 +179,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     if (!this.myChart) {
       return;
     }
-    this.ensureMinSubscription();
-    this.syncCurrentTimeWindowFromSubscription();
     const activeTimeWindow = this.getActiveTimeWindow();
-    const combinedDataEntries = this.getCombinedDataEntries();
+    const seriesEntries = this.getSeriesEntries();
     const newData = [];
     const maxGapMs = this.resolveMaxGapMs();
     this.onResize();
@@ -191,9 +188,9 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
       this.updateXAxisTimeWindow(this.xAxis, activeTimeWindow);
     }
 
-    for (const key in combinedDataEntries) {
+    for (const key in seriesEntries) {
       newData[key] = [];
-      const sourceData = combinedDataEntries[key].data || [];
+      const sourceData = seriesEntries[key].data || [];
       const sortedData = this.isSortedByTimestamp(sourceData) ? sourceData : [...sourceData].sort((a, b) => a[0] - b[0]);
       let lastTs: number = null;
 
@@ -218,6 +215,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     }
 
     this.latestSeriesData = newData;
+
     this.option.series = this.buildVisibleSeries();
 
     this.myChart.setOption({
@@ -225,7 +223,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
       series: this.option.series
     });
     this.updateAxisOffset();
-    this.loadOlderHistoryIfNeeded();
   }
 
   public toggleLegendSeries(legendKey: LegendKey): void {
@@ -294,199 +291,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     return this.ctx?.defaultSubscription?.timeWindow || this.ctx?.timeWindow;
   }
 
-  private syncCurrentTimeWindowFromSubscription(): void {
-    const activeTimeWindow = this.getActiveTimeWindow();
-    if (!activeTimeWindow) {
-      return;
-    }
-    this.currentTimeWindow = {
-      startTs: activeTimeWindow.minTime,
-      endTs: activeTimeWindow.maxTime
-    };
-  }
-
-  private ensureMinSubscription(): void {
-    const minSubscriptionConfig = this.buildMinSubscriptionConfig();
-    if (!minSubscriptionConfig) {
-      this.destroyMinSubscription();
-      return;
-    }
-
-    if (this.minSubscription && this.minSubscriptionSignature === minSubscriptionConfig.signature) {
-      return;
-    }
-
-    this.destroyMinSubscription();
-    this.minSubscriptionSignature = minSubscriptionConfig.signature;
-
-    const subscriptionType = this.resolveSubscriptionType();
-    if (!subscriptionType) {
-      this.destroyMinSubscription();
-      return;
-    }
-
-    const options: WidgetSubscriptionOptions = {
-      type: subscriptionType,
-      datasources: [minSubscriptionConfig.datasource],
-      callbacks: {
-        onDataUpdated: () => {
-          this.onMinSubscriptionDataUpdated();
-        }
-      }
-    } as WidgetSubscriptionOptions;
-
-    let createSubscriptionResult: any;
-    try {
-      createSubscriptionResult = this.ctx?.subscriptionApi?.createSubscription(options, true);
-    } catch (e) {
-      this.minSubscription = null;
-      this.minSubscriptionData = [];
-      this.minSubscriptionSignature = '';
-      return;
-    }
-
-    if (!createSubscriptionResult || typeof createSubscriptionResult.subscribe !== 'function') {
-      return;
-    }
-
-    createSubscriptionResult.subscribe({
-      next: (subscription: any) => {
-        this.minSubscription = subscription;
-        this.minSubscriptionData = this.normalizeSubscriptionData(subscription?.data, minSubscriptionConfig.baseKeyNames);
-        this.onDataUpdated();
-      },
-      error: () => {
-        this.minSubscription = null;
-        this.minSubscriptionData = [];
-      }
-    });
-  }
-
-  private onMinSubscriptionDataUpdated(): void {
-    this.minSubscriptionData = this.normalizeSubscriptionData(this.minSubscription?.data, this.getPrimarySeriesNames());
-    if (this.myChart) {
-      this.onDataUpdated();
-    }
-  }
-
-  private buildMinSubscriptionConfig(): { signature: string; datasource: any; baseKeyNames: string[] } | null {
-    const defaultDatasource = this.ctx?.defaultSubscription?.datasources?.[0] || this.ctx?.datasources?.[0];
-    if (!defaultDatasource) {
-      return null;
-    }
-
-    const runtimePrimaryKeys = (Object.values(this.ctx?.data || {}) as any[])
-      .map(entry => entry?.dataKey)
-      .filter(key => !!key?.name && !String(key.name).endsWith('_min'));
-    const datasourcePrimaryKeys = (Array.isArray(defaultDatasource?.dataKeys) ? defaultDatasource.dataKeys : [])
-      .filter(key => !!key?.name && !String(key.name).endsWith('_min'));
-    const primaryKeys = runtimePrimaryKeys.length ? runtimePrimaryKeys : datasourcePrimaryKeys;
-    if (!primaryKeys.length) {
-      return null;
-    }
-
-    const minDataKeys = primaryKeys.map((key) => ({
-      name: `${key.name}_min`,
-      label: `${key.label || key.name} min`,
-      type: key.type,
-      color: key.color,
-      units: key.units,
-      decimals: key.decimals,
-      pattern: key.pattern,
-      hidden: key.hidden,
-      settings: {
-        ...(key.settings || {})
-      }
-    }));
-
-    const normalizedMinDataKeys = minDataKeys
-      .filter((key) => !!key && !!key.name && !!key.type)
-      .map((key) => ({
-        ...key,
-        settings: key.settings || {}
-      }));
-    if (!normalizedMinDataKeys.length) {
-      return null;
-    }
-
-    const datasource = {
-      type: defaultDatasource.type,
-      name: defaultDatasource.name,
-      entityAliasId: defaultDatasource.entityAliasId,
-      entityName: defaultDatasource.entityName,
-      entityType: defaultDatasource.entityType,
-      entityId: defaultDatasource.entityId,
-      entityFilter: defaultDatasource.entityFilter,
-      dataKeys: normalizedMinDataKeys
-    };
-
-    const entityType = defaultDatasource?.entityType || '';
-    const entityId = defaultDatasource?.entityId || '';
-    const signature = `${entityType}|${entityId}|${normalizedMinDataKeys.map(key => key.name).join(',')}`;
-
-    return {
-      signature,
-      datasource,
-      baseKeyNames: primaryKeys.map(key => key.name)
-    };
-  }
-
-  private destroyMinSubscription(): void {
-    const activeSubscription = this.minSubscription;
-    this.minSubscription = null;
-    this.minSubscriptionData = [];
-    this.minSubscriptionSignature = '';
-
-    if (!activeSubscription) {
-      return;
-    }
-
-    if (typeof activeSubscription.unsubscribe === 'function') {
-      activeSubscription.unsubscribe();
-      return;
-    }
-
-    if (typeof this.ctx?.subscriptionApi?.removeSubscription === 'function') {
-      try {
-        this.ctx.subscriptionApi.removeSubscription(activeSubscription);
-      } catch (e) {
-        // Ignore cleanup errors to prevent widget runtime breaks.
-      }
-    }
-  }
-
-  private resolveSubscriptionType(): any {
-    return this.ctx?.defaultSubscription?.type || null;
-  }
-
-  private normalizeSubscriptionData(data: any, baseKeyNames: string[]): Array<any> {
-    const entries = Object.values(data || {}) as any[];
-    if (!entries.length) {
-      return [];
-    }
-
-    const allowedMinKeys = new Set((baseKeyNames || []).map(name => `${name}_min`));
-    return entries.filter((entry) => {
-      const keyName = entry?.dataKey?.name;
-      return !!keyName && allowedMinKeys.has(keyName);
-    });
-  }
-
-  private getPrimarySeriesNames(): string[] {
-    const entries = Object.values(this.ctx?.data || {}) as any[];
-    return entries
-      .map(entry => entry?.dataKey?.name)
-      .filter(name => !!name && !String(name).endsWith('_min'));
-  }
-
-  private getCombinedDataEntries(): Array<any> {
-    const baseEntries = Object.values(this.ctx?.data || {}) as any[];
-    const baseNames = new Set(baseEntries.map(entry => entry?.dataKey?.name).filter(name => !!name));
-    const minEntries = (this.minSubscriptionData || []).filter((entry) => {
-      const keyName = entry?.dataKey?.name;
-      return !!keyName && !baseNames.has(keyName);
-    });
-    return [...baseEntries, ...minEntries];
+  private getSeriesEntries(): Array<any> {
+    return Object.values(this.ctx?.data || {}) as any[];
   }
 
   private resolveMaxGapMs(): number {
@@ -497,133 +303,12 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     return this.maxConnectedGapSeconds > 0 ? this.maxConnectedGapSeconds * 1000 : 0;
   }
 
-  private loadOlderHistoryIfNeeded(): void {
-    if (!this.isHistoryBackfillEnabled()) {
-      return;
+  private resolveInitialDataDisplayMode(): DataDisplayMode {
+    const rawMode = String(this.ctx?.settings?.dataDisplayMode || '').toLowerCase();
+    if (rawMode === 'seconds' || rawMode === 'min' || rawMode === 'hour') {
+      return rawMode;
     }
-
-    const now = Date.now();
-    const cooldownMs = this.resolveHistoryBackfillCooldownMs();
-    if (this.lastHistoryRequestTs && now - this.lastHistoryRequestTs < cooldownMs) {
-      return;
-    }
-
-    const window = this.ctx?.defaultSubscription?.timeWindow;
-    if (!window || !this.ctx?.data) {
-      return;
-    }
-
-    const datasources = this.ctx?.defaultSubscription?.datasources || this.ctx?.datasources;
-    const firstDatasource = datasources?.[0];
-    const entityType = firstDatasource?.entityType;
-    const entityId = firstDatasource?.entityId;
-    if (!entityType || !entityId) {
-      return;
-    }
-
-    const dataEntries = Object.values(this.ctx.data || {}) as unknown as Array<{
-      data: Array<any>,
-      dataKey: { name: string }
-    }>;
-    if (!dataEntries.length) {
-      return;
-    }
-
-    const keyNames = dataEntries
-      .map(entry => entry?.dataKey?.name)
-      .filter(name => !!name);
-    if (!keyNames.length) {
-      return;
-    }
-
-    const durationMs = Math.max(0, (window.maxTime || 0) - (window.minTime || 0));
-    const keyPlan = this.buildTelemetryKeyPlan(keyNames, durationMs);
-
-    const earliestTs = this.findEarliestTs(dataEntries);
-    if (!isDefinedAndNotNull(earliestTs)) {
-      return;
-    }
-
-    const signature = `${entityType}|${entityId}|${window.minTime}|${window.maxTime}|${keyPlan.queryKeys.join(',')}`;
-    if (signature !== this.historyWindowSignature) {
-      this.historyWindowSignature = signature;
-      this.historyLoadInProgress = false;
-    }
-
-    if (earliestTs <= window.minTime || this.historyLoadInProgress) {
-      return;
-    }
-
-    const batchMs = 7 * 24 * 60 * 60 * 1000;
-    const endTs = earliestTs - 1;
-    const startTs = Math.max(window.minTime, endTs - batchMs + 1);
-    const keysQuery = encodeURIComponent(keyPlan.queryKeys.join(','));
-    const url = `/api/plugins/telemetry/${entityType}/${entityId}/values/timeseries` +
-      `?keys=${keysQuery}` +
-      `&startTs=${startTs}` +
-      `&endTs=${endTs}` +
-      `&limit=50000` +
-      `&agg=NONE` +
-      `&orderBy=ASC`;
-
-    this.historyLoadInProgress = true;
-    this.lastHistoryRequestTs = now;
-    this.http.get(url).subscribe({
-      next: (response: any) => {
-        this.historyLoadInProgress = false;
-        this.mergeHistoryResponse(response, window.minTime, keyPlan.responseKeyToBaseKey);
-      },
-      error: () => {
-        this.historyLoadInProgress = false;
-      }
-    });
-  }
-
-  private buildTelemetryKeyPlan(baseKeyNames: string[], durationMs: number): {
-    queryKeys: string[],
-    responseKeyToBaseKey: Record<string, string>
-  } {
-    const queryKeySet = new Set<string>();
-    const responseKeyToBaseKey: Record<string, string> = {};
-
-    for (const baseKey of baseKeyNames) {
-      if (!baseKey) {
-        continue;
-      }
-
-      queryKeySet.add(baseKey);
-      responseKeyToBaseKey[baseKey] = baseKey;
-
-      if (durationMs > this.minAggregateThresholdMs) {
-        const minKey = `${baseKey}_min`;
-        queryKeySet.add(minKey);
-        responseKeyToBaseKey[minKey] = baseKey;
-      }
-
-      if (durationMs > this.halfHourAggregateThresholdMs) {
-        const halfHourKey = `${baseKey}_30min`;
-        queryKeySet.add(halfHourKey);
-        responseKeyToBaseKey[halfHourKey] = baseKey;
-      }
-    }
-
-    return {
-      queryKeys: Array.from(queryKeySet),
-      responseKeyToBaseKey
-    };
-  }
-
-  private isHistoryBackfillEnabled(): boolean {
-    const enabled = this.ctx?.settings?.enableHistoryBackfill;
-    return enabled === true || enabled === 'true';
-  }
-
-  private resolveHistoryBackfillCooldownMs(): number {
-    const configuredMs = Number(this.ctx?.settings?.historyBackfillCooldownMs);
-    if (Number.isFinite(configuredMs) && configuredMs >= 500) {
-      return configuredMs;
-    }
-    return 5000;
+    return 'seconds';
   }
 
   private isSortedByTimestamp(points: Array<any>): boolean {
@@ -638,104 +323,6 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
       }
     }
     return true;
-  }
-
-  private findEarliestTs(dataEntries: Array<{ data: Array<[number, any]> }>): number | null {
-    let earliest: number = null;
-    for (const entry of dataEntries) {
-      if (!entry?.data?.length) {
-        continue;
-      }
-      const tsValues = entry.data
-        .map(point => this.normalizePoint(point))
-        .filter(point => !!point)
-        .map(point => Number(point[0]));
-      if (!tsValues.length) {
-        continue;
-      }
-      const firstTs = Math.min(...tsValues);
-      if (!Number.isFinite(firstTs)) {
-        continue;
-      }
-      if (!isDefinedAndNotNull(earliest) || firstTs < earliest) {
-        earliest = firstTs;
-      }
-    }
-    return earliest;
-  }
-
-  private mergeHistoryResponse(response: any, minTime: number, responseKeyToBaseKey: Record<string, string>): number {
-    if (!response || typeof response !== 'object') {
-      return 0;
-    }
-
-    const groupedHistory: Record<string, Array<any>> = {};
-    for (const responseKey of Object.keys(response)) {
-      const baseKey = responseKeyToBaseKey?.[responseKey] || responseKey;
-      const items = Array.isArray(response[responseKey]) ? response[responseKey] : [];
-      if (!items.length) {
-        continue;
-      }
-      if (!groupedHistory[baseKey]) {
-        groupedHistory[baseKey] = [];
-      }
-      groupedHistory[baseKey].push(...items);
-    }
-
-    let mergedPoints = 0;
-    for (const key in this.ctx.data) {
-      const seriesEntry = this.ctx.data[key];
-      const seriesKeyName = seriesEntry?.dataKey?.name;
-      if (!seriesKeyName) {
-        continue;
-      }
-
-      const historyItems = Array.isArray(groupedHistory[seriesKeyName]) ? groupedHistory[seriesKeyName] : [];
-      if (!historyItems.length) {
-        continue;
-      }
-
-      const mergedMap = new Map<number, any>();
-      for (const point of seriesEntry.data || []) {
-        const normalizedPoint = this.normalizePoint(point);
-        if (!normalizedPoint) {
-          continue;
-        }
-        const [ts, value] = normalizedPoint;
-        const numericTs = Number(ts);
-        if (Number.isFinite(numericTs)) {
-          mergedMap.set(numericTs, value);
-        }
-      }
-
-      for (const item of historyItems) {
-        const itemTs = Number(item?.ts);
-        if (!Number.isFinite(itemTs) || itemTs < minTime) {
-          continue;
-        }
-        if (!mergedMap.has(itemTs)) {
-          mergedPoints++;
-        }
-        mergedMap.set(itemTs, item?.value);
-      }
-
-      seriesEntry.data = Array.from(mergedMap.entries())
-        .sort((a, b) => a[0] - b[0])
-        .map(([ts, value]) => [ts, value]);
-    }
-
-    return mergedPoints;
-  }
-
-  private normalizePoint(point: any): [number, any] | null {
-    if (!Array.isArray(point) || point.length < 2) {
-      return null;
-    }
-    const ts = Number(point[0]);
-    if (!Number.isFinite(ts)) {
-      return null;
-    }
-    return [ts, point[1]];
   }
 
   private setupToolbox(): EChartsOption['toolbox'] {
@@ -841,8 +428,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private constructTooltipSeriesElement(param: CallbackDataParams, index: number): HTMLElement {
-    const combinedDataEntries = this.getCombinedDataEntries();
-    const seriesEntry = combinedDataEntries[index];
+    const seriesEntries = this.getSeriesEntries();
+    const seriesEntry = seriesEntries[index];
 
     const labelValueElement: HTMLElement = this.renderer.createElement('div');
     this.renderer.setStyle(labelValueElement, 'display', 'flex');
@@ -922,15 +509,14 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
 
   private setupChartLines(): SeriesOption[] {
     const series: SeriesOption[] = [];
-    const combinedDataEntries = this.getCombinedDataEntries();
-    for (const [index, entry] of combinedDataEntries.entries()) {
+    const baseEntries = this.getSeriesEntries();
+    for (const [index, entry] of baseEntries.entries()) {
       const dataKey = entry?.dataKey;
       if (!dataKey) {
         continue;
       }
 
       const seriesName = dataKey.label || dataKey.name;
-      const isMinSeries = String(dataKey.name).endsWith('_min');
       series.push({
         id: index,
         name: seriesName,
@@ -942,9 +528,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
         stackStrategy: 'all',
         data: [],
         lineStyle: {
-          color: dataKey.color,
-          type: isMinSeries ? 'dashed' : 'solid',
-          opacity: isMinSeries ? 0.85 : 1
+          color: dataKey.color
         },
         itemStyle: {
           color: dataKey.color
