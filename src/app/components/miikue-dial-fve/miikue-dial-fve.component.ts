@@ -38,11 +38,13 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
   limitAngle: number = 0;
   isLimitVisible: boolean = false;
   isLimitUnknown: boolean = false;
-  limitRedDashArray: string = '0 251'; // Pattern for red zone
+    limitZoneOffset: number = 251;
+    limitMarker = { x1: 20, y1: 100, x2: 28, y2: 100 };
   lastLimitLabel: string = '';
 
   // Calculated properties
   activeOffset: number = 251; // Max length of arc (pi * 80)
+    mainScaleLimit: number = 300;
   
   displayValue: string = '0';
   displayQValue: string = '0';
@@ -51,6 +53,8 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
   ticks: any[] = [];
   limitTicks: any[] = [];
   currentLimitPct: number = -1;
+    private lastTickSignature = '';
+    private lastLimitVisualSignature = '';
 
   constructor(private cd: ChangeDetectorRef) {}
 
@@ -118,7 +122,7 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
       this.isLimitVisible = false;
       this.isLimitUnknown = false;
       this.currentLimitPct = -1;
-      this.limitRedDashArray = '0 251';
+            this.limitZoneOffset = 251;
       
       if (data.length > 2) {
         const limitItem = data[2];
@@ -137,14 +141,7 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
                 if (this.limitMapping.hasOwnProperty(this._limitValue)) {
                     const limitPct = this.limitMapping[this._limitValue];
                     this.currentLimitPct = limitPct;
-                    
-                    // Angle
-                    this.limitAngle = 180 + (limitPct * 1.8);
-                    
-                    // Red Zone DashArray
-                    const totalLen = 251;
-                    const gap = totalLen * (limitPct / 100);
-                    this.limitRedDashArray = `0 ${gap} ${totalLen}`;
+                    this.updateLimitVisuals(limitPct);
                     
                     this.isLimitVisible = true;
                 } else {
@@ -178,9 +175,56 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
       this.generateTicks();
   }
 
+  private updateLimitVisuals(limitPct: number): void {
+      const centerX = 100;
+      const centerY = 100;
+
+      const clampedPct = Math.max(0, Math.min(limitPct, 100));
+      this.limitAngle = 180 + (clampedPct * 1.8);
+
+      const angleRad = this.limitAngle * (Math.PI / 180);
+
+      // Marker line at current limit angle.
+    // Keep marker inside the same ring as the arc (arc is r=80 with stroke-width 16 => r72..r88).
+    const markerInnerRadius = 72;
+    const markerOuterRadius = 88;
+      this.limitMarker = {
+          x1: centerX + (markerInnerRadius * Math.cos(angleRad)),
+          y1: centerY + (markerInnerRadius * Math.sin(angleRad)),
+          x2: centerX + (markerOuterRadius * Math.cos(angleRad)),
+          y2: centerY + (markerOuterRadius * Math.sin(angleRad))
+      };
+
+      const totalLen = 251;
+      const visibleLen = Math.max(0, totalLen * (1 - (clampedPct / 100)));
+
+      // Same rendering model as active arc:
+      // offset = total - visibleLength, but on reversed path (right->left).
+      this.limitZoneOffset = totalLen - visibleLen;
+
+      const visualSignature = `${this.currentLimitPct}|${visibleLen.toFixed(3)}|${this.limitZoneOffset.toFixed(3)}|${this.limitAngle.toFixed(3)}|${this.limitMarker.x1.toFixed(2)}|${this.limitMarker.y1.toFixed(2)}|${this.limitMarker.x2.toFixed(2)}|${this.limitMarker.y2.toFixed(2)}`;
+      if (visualSignature !== this.lastLimitVisualSignature) {
+          this.lastLimitVisualSignature = visualSignature;
+          console.log('[miikue-dial-fve] Limit visual calc', {
+              rawLimitValue: this._limitValue,
+              mappedLimitPct: this.currentLimitPct,
+              clampedPct,
+              limitAngle: this.limitAngle,
+              limitVisibleLen: visibleLen,
+              limitZoneOffset: this.limitZoneOffset,
+              marker: {
+                  x1: this.limitMarker.x1,
+                  y1: this.limitMarker.y1,
+                  x2: this.limitMarker.x2,
+                  y2: this.limitMarker.y2
+              }
+          });
+      }
+  }
+
   public refreshDisplay(): void {
     this.updateState();
-    // generateTicks is called only on init or mapping change
+        this.ensureTicksUpToDate();
   }
   private formatTruncated(value: number, decimals: number): string {
     if (decimals === undefined || decimals === null) return value.toString();
@@ -192,9 +236,18 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
     });
   }
 
+    public trackByMainTick(index: number, tick: any): string {
+        return `${index}-${tick?.label?.text ?? ''}`;
+    }
+
+    public trackByLimitTick(index: number, tick: any): string {
+        return `${index}-${tick?.pct ?? ''}`;
+    }
+
   public updateState() {
     // Arc length for radius 80 is approx 251.32
     const maxArcLength = 251;
+        const resolvedLimit = this.resolveMaxLimit();
 
     if (!this.isOk) {
         this.displayValue = 'N/A';
@@ -217,15 +270,15 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
     }
 
     // Calculate ratio (0 to 1)
-    const limit = this.maxLimit || 10000; 
-    const ratio = Math.max(0, Math.min(this._pValue / limit, 1));
+        const ratio = Math.max(0, Math.min(this._pValue / resolvedLimit, 1));
     this.activeOffset = maxArcLength - (maxArcLength * ratio);
   }
 
   public generateTicks() {
     const centerX = 100;
     const centerY = 100;
-    const limit = this.maxLimit || 10000;
+                const limit = this.resolveMaxLimit();
+        this.mainScaleLimit = limit;
     
     // 1. Main Ticks (Values) - Outer half of track (r80-r88)
     this.ticks = [];
@@ -262,30 +315,34 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
         });
     });
 
-    // 2. Limit Ticks (Percentages) - Inner half of track (r72-r80)
+    // 2. Limit Ticks (Percentages) - inner half of track (r72-r80)
     this.limitTicks = [];
     const uniquePcts = new Set<number>();
     Object.values(this.limitMapping).forEach(val => uniquePcts.add(val));
-    
-    Array.from(uniquePcts).sort((a, b) => a - b).forEach(pct => {
+
+        const sourcePercentages = uniquePcts.size ?
+            Array.from(uniquePcts).sort((a, b) => a - b) :
+            [0, 25, 50, 100];
+
+        sourcePercentages.forEach(pct => {
         const ratio = pct / 100;
         const angle = 180 + (ratio * 180);
         const angleRad = angle * (Math.PI / 180);
 
-        // Line from r72 (inner edge) to r80 (middle)
-        let x1 = centerX + (72 * Math.cos(angleRad));
-        let y1 = centerY + (72 * Math.sin(angleRad));
-        let x2 = centerX + (80 * Math.cos(angleRad));
-        let y2 = centerY + (80 * Math.sin(angleRad));
+                // Keep limit ticks inside so they do not overlap main ticks.
+                let x1 = centerX + (72 * Math.cos(angleRad));
+                let y1 = centerY + (72 * Math.sin(angleRad));
+                let x2 = centerX + (80 * Math.cos(angleRad));
+                let y2 = centerY + (80 * Math.sin(angleRad));
 
         let lx, ly;
-        // Inner label (r62)
+                // Keep percentage labels close to inner scale.
         if (angle === 180 || angle === 360) {
-            lx = centerX + (66 * Math.cos(angleRad));
-            ly = centerY + 15;
+                    lx = centerX + (66 * Math.cos(angleRad));
+                    ly = centerY + 15;
         } else {
-            lx = centerX + (62 * Math.cos(angleRad));
-            ly = centerY + (62 * Math.sin(angleRad)) + 4;
+                    lx = centerX + (62 * Math.cos(angleRad));
+                    ly = centerY + (62 * Math.sin(angleRad)) + 4;
         }
 
         this.limitTicks.push({
@@ -294,5 +351,33 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
             label: { x: lx, y: ly, text: pct + '%', anchor: 'middle' }
         });
     });
+
+        const signature = `${limit}|${JSON.stringify(Array.from(uniquePcts).sort((a, b) => a - b))}`;
+        if (signature !== this.lastTickSignature) {
+            this.lastTickSignature = signature;
+            console.log('[miikue-dial-fve] Generated ticks (changed)', {
+                maxLimitInput: this.maxLimit,
+                resolvedLimit: limit,
+                mainTicksCount: this.ticks.length,
+                limitTicksCount: this.limitTicks.length
+            });
+        }
   }
+
+    private ensureTicksUpToDate(): void {
+        const limit = this.resolveMaxLimit();
+        const mappingSignature = JSON.stringify(Object.values(this.limitMapping).sort((a, b) => a - b));
+        const targetSignature = `${limit}|${mappingSignature}`;
+        if (!this.ticks.length || !this.limitTicks.length || targetSignature !== this.lastTickSignature) {
+            this.generateTicks();
+        }
+    }
+
+    private resolveMaxLimit(): number {
+        const parsed = Number(this.maxLimit);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+        }
+        return 300;
+    }
 }

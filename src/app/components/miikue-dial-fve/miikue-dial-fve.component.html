@@ -8,71 +8,80 @@
           <path d="M 20 100 A 80 80 0 0 1 180 100" 
                 class="active-arc"
                 stroke-dasharray="251" 
-                [style.stroke]="productionColor"
-                [style.stroke-dashoffset]="activeOffset" />
+                [attr.stroke]="productionColor"
+                [attr.stroke-dashoffset]="activeOffset" />
           
-          <!-- Limit Zone (Red Stripe for Restricted Area) -->
-          <!-- Drawn ON TOP of the active arc. Shows red stripe from limit to 100%. -->
-          <path d="M 20 100 A 80 80 0 0 1 180 100" 
-                class="limit-zone"
-                stroke-dashoffset="0"
-                [style.stroke-dasharray]="limitRedDashArray"
-                [style.stroke]="limitColor"
-                *ngIf="isLimitVisible" />
+          <!-- Generated main ticks (dynamic) -->
+          @for (tick of ticks; track trackByMainTick($index, tick)) {
+          <g>
+            <line [attr.x1]="tick.line.x1" [attr.y1]="tick.line.y1"
+                  [attr.x2]="tick.line.x2" [attr.y2]="tick.line.y2"
+                  [attr.stroke]="'#94a3b8'"
+                  stroke-width="2" />
 
-          <!-- Generated Ticks and Labels (Main Values) -->
-          <ng-container *ngFor="let tick of ticks">
-            <line [attr.x1]="tick.line.x1" [attr.y1]="tick.line.y1" 
-                  [attr.x2]="tick.line.x2" [attr.y2]="tick.line.y2" 
-                  class="center-zero-mark" />
-            
-            <text [attr.x]="tick.label.x" [attr.y]="tick.label.y" 
-                  [style.text-anchor]="tick.label.anchor"
-                  class="scale-label">{{ tick.label.text }}</text>
-          </ng-container>
+            <text [attr.x]="tick.label.x" [attr.y]="tick.label.y"
+                  [attr.text-anchor]="tick.label.anchor"
+                  [attr.fill]="'#94a3b8'"
+                  [attr.font-weight]="'700'"
+                  font-size="10">{{ tick.label.text }}</text>
+          </g>
+              }
 
           <!-- Generated Limit Ticks (Inner Percentages) -->
-          <ng-container *ngFor="let tick of limitTicks">
+              @for (tick of limitTicks; track trackByLimitTick($index, tick)) {
+              <g>
             <line [attr.x1]="tick.line.x1" [attr.y1]="tick.line.y1" 
                   [attr.x2]="tick.line.x2" [attr.y2]="tick.line.y2" 
                   class="center-zero-mark" 
-                  [style.stroke]="tick.pct === currentLimitPct ? limitColor : '#94a3b8'" />
+                  [attr.stroke]="tick.pct === currentLimitPct ? limitColor : '#0ea5e9'"
+                  stroke-width="2" />
             
             <text [attr.x]="tick.label.x" [attr.y]="tick.label.y" 
-                  [style.text-anchor]="tick.label.anchor"
-                  [style.fill]="tick.pct === currentLimitPct ? limitColor : '#94a3b8'"
-                  [style.font-weight]="tick.pct === currentLimitPct ? '900' : '700'"
+                  [attr.text-anchor]="tick.label.anchor"
+                  [attr.fill]="tick.pct === currentLimitPct ? limitColor : '#0ea5e9'"
+                  [attr.font-weight]="tick.pct === currentLimitPct ? '900' : '700'"
+                  font-size="11"
                   class="scale-label">{{ tick.label.text }}</text>
-          </ng-container>
+          </g>
+              }
+
+              <!-- Limit Zone (Red Stripe for Restricted Area) -->
+              <!-- Drawn after ticks to guarantee top-layer visibility during debugging. -->
+              <path d="M 180 100 A 80 80 0 0 0 20 100"
+                        class="limit-zone"
+                        stroke-dasharray="251"
+                        [attr.stroke-dashoffset]="limitZoneOffset"
+                        [attr.stroke]="limitColor"
+                        [attr.opacity]="currentLimitPct > -1 && currentLimitPct < 100 ? 1 : 0" />
 
           <!-- Limit Marker Line (Overlays the active arc) -->
-          <line x1="12" y1="100" x2="28" y2="100" 
+          <line [attr.x1]="limitMarker.x1" [attr.y1]="limitMarker.y1"
+                [attr.x2]="limitMarker.x2" [attr.y2]="limitMarker.y2"
                 class="limit-line"
                 stroke-width="2" 
-                [style.stroke]="limitColor" 
-                *ngIf="isLimitVisible" 
-                [style.transform]="'rotate(' + (limitAngle - 180) + 'deg)'" />
+                [attr.stroke]="limitColor" 
+                [attr.opacity]="currentLimitPct > -1 ? 1 : 0" />
 
           <!-- Text Labels inside SVG for Perfect Scaling -->
           <!-- Primary Value (P) -->
           <text x="100" y="78" text-anchor="middle" class="svg-val-p" 
-                [style.fill]="!isOk ? badColor : productionColor">
+                [attr.fill]="!isOk ? badColor : productionColor">
               {{ !isOk ? '' : '' }}{{ displayValue }} <tspan class="svg-unit" font-size="0.6em" dy="0">{{ _unit }}</tspan>
           </text>
 
           <!-- Secondary Value (Q) -->
           <text x="100" y="98" text-anchor="middle" class="svg-val-q" 
-                [style.fill]="!isOk ? badColor : '#64748b'">
+                [attr.fill]="!isOk ? badColor : '#64748b'">
               Q: {{ displayQValue }} {{ _qUnit }}
           </text>
 
           <!-- Status Footer Background -->
           <rect x="0" y="118" width="200" height="25" rx="0"
-                [style.fill]="!isOk || isLimitUnknown ? '#f3f4f6' : (isLimitVisible && currentLimitPct < 100 ? '#fefce8' : '#dcfce7')" /> 
+                [attr.fill]="!isOk || isLimitUnknown ? '#f3f4f6' : (isLimitVisible && currentLimitPct < 100 ? '#fefce8' : '#dcfce7')" /> 
 
           <!-- Status Text -->
           <text x="100" y="135" text-anchor="middle" class="svg-status" 
-                [style.fill]="!isOk || isLimitUnknown ? badColor : (isLimitVisible && currentLimitPct < 100 ? '#854d0e' : '#15803d')">
+                [attr.fill]="!isOk || isLimitUnknown ? badColor : (isLimitVisible && currentLimitPct < 100 ? '#854d0e' : '#15803d')">
               {{ statusText }}
           </text>
       </svg>

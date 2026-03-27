@@ -48,13 +48,11 @@
     fill: none;
     stroke-width: 6;
     stroke-linecap: flat;
-    transition: stroke-dasharray 0.5s ease;
+    transition: stroke-dashoffset 0.45s ease, opacity 0.2s ease;
 }
 
 .limit-line {
-    transition: transform 0.5s ease;
-    transform-origin: 100px 100px;
-    transform-box: view-box;
+    transition: x1 0.45s ease, y1 0.45s ease, x2 0.45s ease, y2 0.45s ease, opacity 0.2s ease;
 }
 
 /* Active segments */
