@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 
 @Component({
   selector: 'tb-miikue-dial-fve',
@@ -37,15 +37,12 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
   
   _unit: string = 'kW';
   _qUnit: string = 'kVAr';
-  _limitUnit: string = 'kW';
-
   _pDecimals: number = 1;
   _qDecimals: number = 1;
 
   // Limit logic
   limitMapping: { [key: number]: number } = {};
   limitAngle: number = 0;
-  isLimitVisible: boolean = false;
   isLimitUnknown: boolean = false;
     limitZoneOffset: number = 251;
     limitMarker = { x1: 20, y1: 100, x2: 28, y2: 100 };
@@ -62,8 +59,7 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
   ticks: any[] = [];
   limitTicks: any[] = [];
   currentLimitPct: number = -1;
-    private lastTickSignature = '';
-    private lastLimitVisualSignature = '';
+    private tickSignature = '';
 
   constructor(private cd: ChangeDetectorRef) {}
 
@@ -76,7 +72,7 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['ctx'] && this.ctx && this.ctx.$scope) {
-        this.ctx.$scope.miikueDialFveWidget = this;
+            this.ctx.$scope.miikueDialFveWidget = this;
     }
         this.applySettingsFromCtx();
     
@@ -169,10 +165,9 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
       }
 
       // 3. Value: Limit (Omezení)
-      this.isLimitVisible = false;
       this.isLimitUnknown = false;
       this.currentLimitPct = -1;
-            this.limitZoneOffset = 251;
+    this.limitZoneOffset = 251;
       
       if (data.length > 2) {
         const limitItem = data[2];
@@ -192,8 +187,6 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
                     const limitPct = this.limitMapping[this._limitValue];
                     this.currentLimitPct = limitPct;
                     this.updateLimitVisuals(limitPct);
-                    
-                    this.isLimitVisible = true;
                 } else {
                     // Value exists but not in mapping
                     this.isLimitUnknown = true;
@@ -234,10 +227,9 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
 
       const angleRad = this.limitAngle * (Math.PI / 180);
 
-      // Marker line at current limit angle.
-    // Keep marker inside the same ring as the arc (arc is r=80 with stroke-width 16 => r72..r88).
-    const markerInnerRadius = 72;
-    const markerOuterRadius = 88;
+            // Keep marker inside the same ring as the arc (r72..r88).
+            const markerInnerRadius = 72;
+            const markerOuterRadius = 88;
       this.limitMarker = {
           x1: centerX + (markerInnerRadius * Math.cos(angleRad)),
           y1: centerY + (markerInnerRadius * Math.sin(angleRad)),
@@ -248,34 +240,14 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
       const totalLen = 251;
       const visibleLen = Math.max(0, totalLen * (1 - (clampedPct / 100)));
 
-      // Same rendering model as active arc:
-      // offset = total - visibleLength, but on reversed path (right->left).
       this.limitZoneOffset = totalLen - visibleLen;
-
-      const visualSignature = `${this.currentLimitPct}|${visibleLen.toFixed(3)}|${this.limitZoneOffset.toFixed(3)}|${this.limitAngle.toFixed(3)}|${this.limitMarker.x1.toFixed(2)}|${this.limitMarker.y1.toFixed(2)}|${this.limitMarker.x2.toFixed(2)}|${this.limitMarker.y2.toFixed(2)}`;
-      if (visualSignature !== this.lastLimitVisualSignature) {
-          this.lastLimitVisualSignature = visualSignature;
-          console.log('[miikue-dial-fve] Limit visual calc', {
-              rawLimitValue: this._limitValue,
-              mappedLimitPct: this.currentLimitPct,
-              clampedPct,
-              limitAngle: this.limitAngle,
-              limitVisibleLen: visibleLen,
-              limitZoneOffset: this.limitZoneOffset,
-              marker: {
-                  x1: this.limitMarker.x1,
-                  y1: this.limitMarker.y1,
-                  x2: this.limitMarker.x2,
-                  y2: this.limitMarker.y2
-              }
-          });
-      }
   }
 
   public refreshDisplay(): void {
     this.updateState();
         this.ensureTicksUpToDate();
   }
+
   private formatTruncated(value: number, decimals: number): string {
     if (decimals === undefined || decimals === null) return value.toString();
     const multiplier = Math.pow(10, decimals);
@@ -313,22 +285,21 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
     // Status text logic
     if (this.isLimitUnknown) {
         this.statusText = this.errorText;
-    } else if (this.isLimitVisible && this.currentLimitPct > -1 && this.currentLimitPct < 100) {
+    } else if (this.currentLimitPct > -1 && this.currentLimitPct < 100) {
         this.statusText = this.limitText.replace('{value}', this.currentLimitPct.toString());
     } else {
         this.statusText = this.okText;
     }
 
-    // Calculate ratio (0 to 1)
-        const ratio = Math.max(0, Math.min(this._pValue / resolvedLimit, 1));
+    const ratio = Math.max(0, Math.min(this._pValue / resolvedLimit, 1));
     this.activeOffset = maxArcLength - (maxArcLength * ratio);
   }
 
   public generateTicks() {
     const centerX = 100;
     const centerY = 100;
-                const limit = this.resolveMaxLimit();
-        this.mainScaleLimit = limit;
+    const limit = this.resolveMaxLimit();
+    this.mainScaleLimit = limit;
     
     // 1. Main Ticks (Values) - Outer half of track (r80-r88)
     this.ticks = [];
@@ -402,25 +373,16 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
         });
     });
 
-        const signature = `${limit}|${JSON.stringify(Array.from(uniquePcts).sort((a, b) => a - b))}`;
-        if (signature !== this.lastTickSignature) {
-            this.lastTickSignature = signature;
-            console.log('[miikue-dial-fve] Generated ticks (changed)', {
-                maxLimitInput: this.maxLimit,
-                resolvedLimit: limit,
-                mainTicksCount: this.ticks.length,
-                limitTicksCount: this.limitTicks.length
-            });
-        }
+    this.tickSignature = `${limit}|${JSON.stringify(Array.from(uniquePcts).sort((a, b) => a - b))}`;
   }
 
     private ensureTicksUpToDate(): void {
         const limit = this.resolveMaxLimit();
         const mappingSignature = JSON.stringify(Object.values(this.limitMapping).sort((a, b) => a - b));
-        const targetSignature = `${limit}|${mappingSignature}`;
-        if (!this.ticks.length || !this.limitTicks.length || targetSignature !== this.lastTickSignature) {
-            this.generateTicks();
-        }
+    const targetSignature = `${limit}|${mappingSignature}`;
+    if (!this.ticks.length || !this.limitTicks.length || targetSignature !== this.tickSignature) {
+      this.generateTicks();
+    }
     }
 
     private resolveMaxLimit(): number {

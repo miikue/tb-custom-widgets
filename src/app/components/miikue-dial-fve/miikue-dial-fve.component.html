@@ -77,11 +77,11 @@
 
           <!-- Status Footer Background -->
           <rect x="0" y="118" width="200" height="25" rx="0"
-                [attr.fill]="!isOk || isLimitUnknown ? '#f3f4f6' : (isLimitVisible && currentLimitPct < 100 ? '#fefce8' : '#dcfce7')" /> 
+                [attr.fill]="!isOk || isLimitUnknown ? '#f3f4f6' : (currentLimitPct > -1 && currentLimitPct < 100 ? '#fefce8' : '#dcfce7')" /> 
 
           <!-- Status Text -->
           <text x="100" y="135" text-anchor="middle" class="svg-status" 
-                [attr.fill]="!isOk || isLimitUnknown ? badColor : (isLimitVisible && currentLimitPct < 100 ? '#854d0e' : '#15803d')">
+                [attr.fill]="!isOk || isLimitUnknown ? badColor : (currentLimitPct > -1 && currentLimitPct < 100 ? '#854d0e' : '#15803d')">
               {{ statusText }}
           </text>
       </svg>

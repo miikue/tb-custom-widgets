@@ -35,7 +35,6 @@ import { ExampleChartSettingsComponent } from './example-chart/chart-settings/ex
 // Miikue Components
 import { MiikueDialPretokComponent } from '../miikue-dial-pretok/miikue-dial-pretok.component';
 import { MiikueDialFveComponent } from '../miikue-dial-fve/miikue-dial-fve.component';
-import { MiikueDialFveSettingsComponent } from '../miikue-dial-fve/chart-settings/miikue-dial-fve-settings.component';
 import { MiikueDialFveBasicConfigComponent } from '../miikue-dial-fve/basic-config/miikue-dial-fve-basic-config.component';
 import { MiikueRegulaceComponent } from '../miikue-regulace/miikue-regulace.component';
 import { MiikueLabelComponent } from '../miikue-label/miikue-label.component';
@@ -73,7 +72,6 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     // Miikue Components
     MiikueDialPretokComponent,
     MiikueDialFveComponent,
-    MiikueDialFveSettingsComponent,
     MiikueDialFveBasicConfigComponent,
     MiikueRegulaceComponent,
     MiikueLabelComponent,
@@ -118,7 +116,6 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
         // Miikue
     MiikueDialPretokComponent,
     MiikueDialFveComponent,
-    MiikueDialFveSettingsComponent,
     MiikueDialFveBasicConfigComponent,
     MiikueRegulaceComponent,
     MiikueLabelComponent,
