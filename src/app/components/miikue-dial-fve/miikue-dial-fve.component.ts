@@ -7,19 +7,28 @@ import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges, 
 })
 export class MiikueDialFveComponent implements OnInit, OnChanges {
 
+    private readonly defaultMaxLimit = 1000;
+    private readonly defaultProductionColor = '#eab308';
+    private readonly defaultLimitColor = '#ef4444';
+    private readonly defaultLimitText = 'OMEZENO NA {value}%';
+    private readonly defaultErrorText = 'NEZNÁMÝ STAV LIMITU';
+    private readonly defaultOkText = 'NE-OMEZENO';
+    private readonly defaultBadText = 'NEAKTUÁLNÍ DATA';
+    private readonly defaultBadColor = '#ef4444';
+
   @Input() ctx: any;
   
-  @Input() maxLimit: number = 10000; // Scale limit (0 to 10000)
-  @Input() productionColor: string = '#eab308'; // Yellow/Orange for FVE
-  @Input() limitColor: string = '#ef4444'; // Red for limit indication (future use)
+        maxLimit: number = this.defaultMaxLimit; // Scale limit
+        productionColor: string = this.defaultProductionColor;
+        limitColor: string = this.defaultLimitColor;
 
-  @Input() limitText: string = 'OMEZENO NA {value}%';
-  @Input() errorText: string = 'NEZNÁMÝ STAV LIMITU';
-  @Input() okText: string = 'NE-OMEZENO';
+        limitText: string = this.defaultLimitText;
+        errorText: string = this.defaultErrorText;
+        okText: string = this.defaultOkText;
   
   @Input() isOk: boolean = true;
-  @Input() badText: string = 'NEAKTUÁLNÍ DATA';
-  @Input() badColor: string = '#ef4444';
+        badText: string = this.defaultBadText;
+        badColor: string = this.defaultBadColor;
 
   // Internal properties
   _pValue: number = 0; 
@@ -69,18 +78,59 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
     if (changes['ctx'] && this.ctx && this.ctx.$scope) {
         this.ctx.$scope.miikueDialFveWidget = this;
     }
+        this.applySettingsFromCtx();
     
     this.refreshDisplay();
   }
 
   public onInit(): void {
+      this.applySettingsFromCtx();
       this.onDataUpdated();
   }
 
   public onDataUpdated(): void {
+      this.applySettingsFromCtx();
       this.extractDataFromCtx();
       this.refreshDisplay();
       this.cd.detectChanges(); // Force update
+  }
+
+  private applySettingsFromCtx(): void {
+      const settings = this.ctx?.settings;
+      if (!settings) {
+          return;
+      }
+
+      this.maxLimit = this.pickNumberSetting(settings.maxLimit, this.maxLimit, this.defaultMaxLimit);
+      this.productionColor = this.pickStringSetting(settings.productionColor, this.productionColor, this.defaultProductionColor);
+      this.limitColor = this.pickStringSetting(settings.limitColor, this.limitColor, this.defaultLimitColor);
+      this.limitText = this.pickStringSetting(settings.limitText, this.limitText, this.defaultLimitText);
+      this.errorText = this.pickStringSetting(settings.errorText, this.errorText, this.defaultErrorText);
+    this.okText = this.pickStringSetting(settings.okText ?? settings.OkText, this.okText, this.defaultOkText);
+      this.badText = this.pickStringSetting(settings.badText, this.badText, this.defaultBadText);
+      this.badColor = this.pickStringSetting(settings.badColor, this.badColor, this.defaultBadColor);
+  }
+
+  private pickStringSetting(value: any, currentValue: string, fallback: string): string {
+      if (typeof value === 'string' && value.trim().length) {
+          return value;
+      }
+      if (typeof currentValue === 'string' && currentValue.trim().length) {
+          return currentValue;
+      }
+      return fallback;
+  }
+
+  private pickNumberSetting(value: any, currentValue: number, fallback: number): number {
+      const parsedFromSettings = Number(value);
+      if (Number.isFinite(parsedFromSettings) && parsedFromSettings > 0) {
+          return parsedFromSettings;
+      }
+      const parsedCurrent = Number(currentValue);
+      if (Number.isFinite(parsedCurrent) && parsedCurrent > 0) {
+          return parsedCurrent;
+      }
+      return fallback;
   }
 
   private extractDataFromCtx(): void {

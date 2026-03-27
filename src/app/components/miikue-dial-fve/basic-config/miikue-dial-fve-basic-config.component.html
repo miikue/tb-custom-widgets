@@ -1,0 +1,64 @@
+<div [formGroup]="configFormGroup">
+  <tb-datasources
+    [configMode]="basicMode"
+    hideDataKeys
+    formControlName="datasources">
+  </tb-datasources>
+
+  <tb-data-keys-panel
+    panelTitle="Body"
+    addKeyTitle="Přidat bod"
+    keySettingsTitle="Nastavení bodu"
+    removeKeyTitle="Odebrat bod"
+    noKeysText="Nejsou nastavené žádné body"
+    hideDataKeyColor
+    [datasourceType]="datasource?.type"
+    [deviceId]="datasource?.deviceId"
+    [entityAliasId]="datasource?.entityAliasId"
+    formControlName="dataKeys">
+  </tb-data-keys-panel>
+
+  <mat-form-field>
+    <mat-label>Max limit</mat-label>
+    <input matInput type="number" min="1" formControlName="maxLimit"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Production color</mat-label>
+    <input matInput type="color" formControlName="productionColor"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Limit color</mat-label>
+    <input matInput type="color" formControlName="limitColor"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Bad color</mat-label>
+    <input matInput type="color" formControlName="badColor"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Limit text</mat-label>
+    <input matInput type="text" formControlName="limitText"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Error text</mat-label>
+    <input matInput type="text" formControlName="errorText"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>OK text</mat-label>
+    <input matInput type="text" formControlName="okText"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Bad text</mat-label>
+    <input matInput type="text" formControlName="badText"/>
+  </mat-form-field>
+
+  <tb-widget-actions-panel
+    formControlName="actions">
+  </tb-widget-actions-panel>
+</div>
