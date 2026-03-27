@@ -60,6 +60,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   private option: EChartsOption;
   private latestSeriesData: any[][] = [];
   private hiddenSeriesIndexes = new Set<number>();
+  private aggregationSubscription: any = null;
+  private aggregationEntries: Array<any> = [];
 
   private valueFormatter: ValueFormatProcessor;
 
@@ -88,9 +90,11 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     this.prepareValueFormat();
     this.initEchart();
     this.initLegend();
+    this.applyDataDisplayModeSubscription();
   }
 
   ngOnDestroy(): void {
+    this.destroyAggregationSubscription();
     this.shapeResize$?.disconnect();
   }
 
@@ -102,8 +106,9 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     this.selectedDataDisplayMode = mode;
     this.hiddenSeriesIndexes.clear();
     this.latestSeriesData = [];
+    this.applyDataDisplayModeSubscription();
 
-    if (this.myChart) {
+    if (this.myChart && this.selectedDataDisplayMode === 'seconds') {
       this.onDataUpdated();
     }
   }
@@ -281,7 +286,329 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private getSeriesEntries(): Array<any> {
+    if (this.selectedDataDisplayMode !== 'seconds') {
+      return this.aggregationEntries;
+    }
     return Object.values(this.ctx?.data || {}) as any[];
+  }
+
+  private applyDataDisplayModeSubscription(): void {
+    if (this.selectedDataDisplayMode === 'seconds') {
+      this.destroyAggregationSubscription();
+      this.aggregationEntries = [];
+      return;
+    }
+
+    this.ensureAggregationSubscription();
+  }
+
+  private ensureAggregationSubscription(): void {
+    const suffix = this.resolveAggregationSuffix(this.selectedDataDisplayMode);
+    const baseDatasources = this.ctx?.defaultSubscription?.datasources;
+    if (!Array.isArray(baseDatasources) || !baseDatasources.length || !this.ctx?.subscriptionApi) {
+      this.aggregationEntries = [];
+      return;
+    }
+
+    this.destroyAggregationSubscription();
+
+    const datasources = baseDatasources.map((datasource: any) => ({
+      ...datasource,
+      dataKeys: (datasource?.dataKeys || []).map((dataKey: any) => {
+        const baseName = this.stripAggregationSuffix(dataKey?.name);
+        return {
+          ...dataKey,
+          name: `${baseName}${suffix}`,
+          label: dataKey?.label || baseName
+        };
+      })
+    }));
+
+    const originalSnapshot = this.buildDatasourceSnapshot(baseDatasources);
+    const newSnapshot = this.buildDatasourceSnapshot(datasources);
+    const baseSubscriptionOptions = this.ctx?.defaultSubscription?.options || {};
+    const customTimeWindowConfig = this.resolveCustomTimeWindowConfig(baseSubscriptionOptions);
+    console.log('[miikue-chart-line] Subscription switch snapshots', {
+      mode: this.selectedDataDisplayMode,
+      suffix,
+      originalSubscriptionDatasources: originalSnapshot,
+      newSubscriptionDatasources: newSnapshot,
+      defaultSubscriptionTimeWindow: this.ctx?.defaultSubscription?.timeWindow,
+      customTimeWindowConfig
+    });
+
+    const options: any = {
+      ...baseSubscriptionOptions,
+      type: this.resolveSubscriptionType(),
+      datasources,
+      useDashboardTimewindow: false,
+      displayTimewindow: true,
+      callbacks: {
+        onDataUpdated: () => this.onAggregationSubscriptionDataUpdated(),
+        onDataUpdateError: (_subscription: any, e: any) => {
+          console.error('[miikue-chart-line] Custom subscription data update error', {
+            mode: this.selectedDataDisplayMode,
+            error: e,
+            selectedSuffix: suffix,
+            timeWindowConfig: options.timeWindowConfig
+          });
+        },
+        onSubscriptionMessage: (_subscription: any, message: any) => {
+          console.log('[miikue-chart-line] Custom subscription message', {
+            mode: this.selectedDataDisplayMode,
+            message
+          });
+        },
+        timeWindowUpdated: (_subscription: any, timeWindowConfig: any) => {
+          console.log('[miikue-chart-line] Custom subscription timewindow updated', {
+            mode: this.selectedDataDisplayMode,
+            timeWindowConfig
+          });
+        }
+      }
+    };
+
+    if (customTimeWindowConfig) {
+      options.timeWindowConfig = customTimeWindowConfig;
+    }
+
+    console.log('[miikue-chart-line] New custom subscription options', {
+      type: options.type,
+      useDashboardTimewindow: options.useDashboardTimewindow,
+      displayTimewindow: options.displayTimewindow,
+      timeWindowConfig: options.timeWindowConfig,
+      selectedSuffix: suffix,
+      datasources: newSnapshot
+    });
+
+    this.ctx.subscriptionApi.createSubscription(options, true).subscribe((subscription: any) => {
+      this.aggregationSubscription = subscription;
+
+      const activeTimeWindow = this.getActiveTimeWindow();
+      if (activeTimeWindow?.minTime && activeTimeWindow?.maxTime && subscription?.onUpdateTimewindow) {
+        const interval = activeTimeWindow.interval;
+        console.log('[miikue-chart-line] Forcing custom subscription timewindow refresh', {
+          mode: this.selectedDataDisplayMode,
+          startTimeMs: activeTimeWindow.minTime,
+          endTimeMs: activeTimeWindow.maxTime,
+          interval
+        });
+        subscription.onUpdateTimewindow(activeTimeWindow.minTime, activeTimeWindow.maxTime, interval);
+      }
+
+      this.onAggregationSubscriptionDataUpdated();
+    });
+  }
+
+  private onAggregationSubscriptionDataUpdated(): void {
+    const baseEntries = Object.values(this.ctx?.data || {}) as any[];
+    const incoming = this.normalizeSubscriptionData(this.aggregationSubscription?.data);
+    const incomingSnapshot = incoming.map((entry: any, index: number) => ({
+      index,
+      keyName: entry?.dataKey?.name,
+      keyLabel: entry?.dataKey?.label,
+      points: Array.isArray(entry?.data) ? entry.data.length : 0,
+      firstPointTs: Array.isArray(entry?.data) && entry.data.length ? entry.data[0]?.[0] : null,
+      lastPointTs: Array.isArray(entry?.data) && entry.data.length ? entry.data[entry.data.length - 1]?.[0] : null
+    }));
+
+    console.log('[miikue-chart-line] Incoming custom subscription update', {
+      mode: this.selectedDataDisplayMode,
+      seriesCount: incoming.length,
+      snapshot: incomingSnapshot,
+      rawData: incoming
+    });
+
+    if (this.selectedDataDisplayMode === 'hour') {
+      const totalPoints = incomingSnapshot.reduce((sum, item) => sum + (Number(item.points) || 0), 0);
+      if (totalPoints === 0) {
+        console.warn('[miikue-chart-line] Hour mode returned zero points. Likely suffix mismatch for hourly keys.', {
+          expectedSuffix: this.resolveAggregationSuffix('hour'),
+          expectedKeyNames: this.buildExpectedAggregatedKeyNames('hour'),
+          tip: 'If your telemetry uses different hourly suffix, set ctx.settings.hourAggregationSuffix (e.g. _60min).'
+        });
+      }
+    }
+
+    this.aggregationEntries = incoming.map((entry, index) => {
+      const baseDataKey = baseEntries[index]?.dataKey || {};
+      const entryDataKey = entry?.dataKey || {};
+      const baseName = this.stripAggregationSuffix(baseDataKey?.name || entryDataKey?.name);
+      return {
+        ...entry,
+        data: Array.isArray(entry?.data) ? entry.data : [],
+        dataKey: {
+          ...entryDataKey,
+          label: baseDataKey?.label || entryDataKey?.label || baseName,
+          name: baseName,
+          color: baseDataKey?.color || entryDataKey?.color,
+          decimals: isDefinedAndNotNull(baseDataKey?.decimals) ? baseDataKey.decimals : entryDataKey?.decimals,
+          units: isDefinedAndNotNull(baseDataKey?.units) ? baseDataKey.units : entryDataKey?.units
+        }
+      };
+    });
+
+    if (this.myChart) {
+      this.onDataUpdated();
+    }
+  }
+
+  private normalizeSubscriptionData(data: any): Array<any> {
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === 'object') {
+      return Object.values(data) as Array<any>;
+    }
+    return [];
+  }
+
+  private destroyAggregationSubscription(): void {
+    if (this.aggregationSubscription?.unsubscribe) {
+      this.aggregationSubscription.unsubscribe();
+    }
+    if (this.aggregationSubscription?.destroy) {
+      this.aggregationSubscription.destroy();
+    }
+    this.aggregationSubscription = null;
+  }
+
+  private resolveSubscriptionType(): any {
+    return this.ctx?.defaultSubscription?.type || this.ctx?.defaultSubscription?.subscriptionType || 'timeseries';
+  }
+
+  private stripAggregationSuffix(value: string): string {
+    const text = String(value || '');
+    return text.replace(/_(min|hour)$/i, '');
+  }
+
+  private resolveAggregationSuffix(mode: DataDisplayMode): string {
+    const minSuffix = this.normalizeSuffix(this.ctx?.settings?.minAggregationSuffix, '_min');
+    const hourSuffix = this.normalizeSuffix(this.ctx?.settings?.hourAggregationSuffix, '_hour');
+    return mode === 'min' ? minSuffix : hourSuffix;
+  }
+
+  private normalizeSuffix(value: any, fallback: string): string {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      return fallback;
+    }
+    return raw.startsWith('_') ? raw : `_${raw}`;
+  }
+
+  private buildExpectedAggregatedKeyNames(mode: DataDisplayMode): string[] {
+    const suffix = this.resolveAggregationSuffix(mode);
+    const baseEntries = Object.values(this.ctx?.data || {}) as any[];
+    return baseEntries
+      .map((entry: any) => this.stripAggregationSuffix(entry?.dataKey?.name || ''))
+      .filter((name: string) => !!name)
+      .map((name: string) => `${name}${suffix}`);
+  }
+
+  private buildDatasourceSnapshot(datasources: Array<any>): Array<any> {
+    return (datasources || []).map((datasource: any, index: number) => ({
+      index,
+      type: datasource?.type,
+      name: datasource?.name,
+      entityType: datasource?.entityType,
+      entityAliasId: datasource?.entityAliasId,
+      dataKeys: (datasource?.dataKeys || []).map((dataKey: any) => ({
+        name: dataKey?.name,
+        label: dataKey?.label,
+        type: dataKey?.type,
+        color: dataKey?.color,
+        units: dataKey?.units,
+        decimals: dataKey?.decimals
+      }))
+    }));
+  }
+
+  private resolveCustomTimeWindowConfig(baseSubscriptionOptions: any): any {
+    const fromBaseOptions = this.cloneObject(baseSubscriptionOptions?.timeWindowConfig);
+    const fromDefaultSubscription = this.cloneObject(this.ctx?.defaultSubscription?.timeWindowConfig);
+    const sourceConfig = fromBaseOptions || fromDefaultSubscription;
+    const activeTimeWindow = this.getActiveTimeWindow();
+
+    if (sourceConfig) {
+      const normalized = this.normalizeTimeWindowConfig(sourceConfig, activeTimeWindow);
+      this.ensureAggregationLimit(normalized, activeTimeWindow);
+      return normalized;
+    }
+
+    if (activeTimeWindow?.minTime && activeTimeWindow?.maxTime) {
+      const fallbackConfig = {
+        history: {
+          fixedTimewindow: {
+            startTimeMs: activeTimeWindow.minTime,
+            endTimeMs: activeTimeWindow.maxTime
+          }
+        }
+      } as any;
+      this.ensureAggregationLimit(fallbackConfig, activeTimeWindow);
+      return {
+        ...fallbackConfig
+      };
+    }
+
+    return undefined;
+  }
+
+  private normalizeTimeWindowConfig(sourceConfig: any, activeTimeWindow?: WidgetTimewindow): any {
+    const config = this.cloneObject(sourceConfig) || {};
+    const fixedWindow = config?.fixedWindow;
+    if (!config.history || typeof config.history !== 'object') {
+      config.history = {};
+    }
+
+    if (fixedWindow?.startTimeMs && fixedWindow?.endTimeMs && !config.history.fixedTimewindow) {
+      config.history.fixedTimewindow = {
+        startTimeMs: fixedWindow.startTimeMs,
+        endTimeMs: fixedWindow.endTimeMs
+      };
+    }
+
+    if (activeTimeWindow?.minTime && activeTimeWindow?.maxTime) {
+      config.history.fixedTimewindow = {
+        startTimeMs: activeTimeWindow.minTime,
+        endTimeMs: activeTimeWindow.maxTime
+      };
+    }
+
+    return config;
+  }
+
+  private ensureAggregationLimit(timeWindowConfig: any, activeTimeWindow?: WidgetTimewindow): void {
+    if (!timeWindowConfig || !activeTimeWindow?.minTime || !activeTimeWindow?.maxTime) {
+      return;
+    }
+
+    if (this.selectedDataDisplayMode === 'hour') {
+      // For hourly pre-aggregated keys, keep backend/widget aggregation untouched.
+      return;
+    }
+
+    const bucketMs = 60 * 1000;
+    const durationMs = Math.max(0, activeTimeWindow.maxTime - activeTimeWindow.minTime);
+    const recommendedLimit = Math.min(50000, Math.max(1000, Math.ceil(durationMs / bucketMs) + 10));
+    const currentLimit = Number(timeWindowConfig?.aggregation?.limit);
+    const finalLimit = Number.isFinite(currentLimit) ? Math.max(currentLimit, recommendedLimit) : recommendedLimit;
+
+    timeWindowConfig.aggregation = {
+      ...(timeWindowConfig.aggregation || {}),
+      type: timeWindowConfig?.aggregation?.type || 'NONE',
+      limit: finalLimit
+    };
+  }
+
+  private cloneObject<T>(value: T): T {
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+    try {
+      return JSON.parse(JSON.stringify(value)) as T;
+    } catch {
+      return value;
+    }
   }
 
   private resolveMaxGapMs(): number {
