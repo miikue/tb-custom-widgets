@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 
 @Component({
   selector: 'tb-miikue-regulace',
@@ -7,17 +7,23 @@ import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges, 
 })
 export class MiikueRegulaceComponent implements OnInit, OnChanges {
 
+    private readonly defaultTextOn = 'AKTIVNÍ';
+    private readonly defaultTextOff = 'NEAKTIVNÍ';
+    private readonly defaultBadText = 'NEAKTUÁLNÍ DATA';
+    private readonly defaultBadColor = '#ef4444';
+
   @Input() ctx: any;
-  @Input() textOn: string = 'AKTIVNÍ';
-  @Input() textOff: string = 'NEAKTIVNÍ';
+    @Input() textOn: string = this.defaultTextOn;
+    @Input() textOff: string = this.defaultTextOff;
 
   @Input() isOk: boolean = true;
-  @Input() badText: string = 'NEAKTUÁLNÍ DATA';
-  @Input() badColor: string = '#ef4444';
+    @Input() badText: string = this.defaultBadText;
+    @Input() badColor: string = this.defaultBadColor;
 
   // Data properties
   options: Array<{ value: number, label: string }> = [];
   activeValue: number = -1;
+    selectedOptionValue: number | null = null;
   
   // Visual state
   psdOut: string = '0';
@@ -48,18 +54,43 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
     if (changes['ctx'] && this.ctx && this.ctx.$scope) {
         this.ctx.$scope.miikueRegulaceWidget = this;
     }
+    this.applySettingsFromCtx();
     if (changes['isOk'] || changes['ctx']) {
         this.refreshData();
     }
   }
 
   public onInit(): void {
+      this.applySettingsFromCtx();
       this.refreshData();
   }
 
   public onDataUpdated(): void {
+      this.applySettingsFromCtx();
       this.refreshData();
       this.cd.detectChanges();
+  }
+
+  private applySettingsFromCtx(): void {
+      const settings = this.ctx?.settings;
+      if (!settings) {
+          return;
+      }
+
+      this.textOn = this.pickStringSetting(settings.textOn, this.textOn, this.defaultTextOn);
+      this.textOff = this.pickStringSetting(settings.textOff, this.textOff, this.defaultTextOff);
+      this.badText = this.pickStringSetting(settings.badText, this.badText, this.defaultBadText);
+      this.badColor = this.pickStringSetting(settings.badColor, this.badColor, this.defaultBadColor);
+  }
+
+  private pickStringSetting(value: any, currentValue: string, fallback: string): string {
+      if (typeof value === 'string' && value.trim().length) {
+          return value;
+      }
+      if (typeof currentValue === 'string' && currentValue.trim().length) {
+          return currentValue;
+      }
+      return fallback;
   }
 
   private refreshData(): void {
@@ -69,6 +100,7 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
           this.regStatusColor = this.badColor;
           
           this.activeValue = -1;
+          this.selectedOptionValue = null;
           this.currentMode = '-';
           this.modeColor = '#94a3b8';
 
@@ -76,7 +108,7 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
           return;
       }
 
-      if (!this.ctx || !this.ctx.defaultSubscription) return;
+    if (!this.ctx || !this.ctx.$scope) return;
 
       const data = this.ctx.$scope.data;
       if (data && data.length > 0) {
@@ -92,6 +124,8 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
           if (regulaceItem.data && regulaceItem.data.length) {
               const latestPoint = regulaceItem.data[regulaceItem.data.length - 1];
               this.activeValue = Number(latestPoint[1]);
+              this.ensureFallbackOption();
+              this.updateSelectedOptionValue();
               this.updateCurrentModeDisplay(); 
           }
           
@@ -111,7 +145,7 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
           // 3. Process Third Data Source (Regulation Status)
           if (data.length > 2) {
               const statusItem = data[2];
-              const sLabel = statusItem.dataKey.label;
+              const sLabel = statusItem.dataKey?.label || statusItem.dataKey?.name;
               
               if (sLabel && sLabel !== this.lastRegStatusLabel) {
                   this.parseStatusMap(sLabel);
@@ -161,6 +195,8 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
               });
           }
       }
+      this.ensureFallbackOption();
+      this.updateSelectedOptionValue();
   }
 
   private parseStatusMap(label: string): void {
@@ -212,7 +248,7 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
   }
 
   private updateCurrentModeDisplay(): void {
-      const activeOpt = this.options.find(o => o.value === this.activeValue);
+      const activeOpt = this.options.find(o => o.value === this.selectedOptionValue);
       if (activeOpt) {
           this.currentMode = activeOpt.label;
           
@@ -229,19 +265,56 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
           this.modeColor = this.badColor;
       }
   }
-  
-  public getOptionClass(opt: {value: number, label: string}): string {
-      if (this.activeValue !== opt.value) return '';
-      
+
+  private updateSelectedOptionValue(): void {
+      if (!this.options.length) {
+          this.selectedOptionValue = null;
+          return;
+      }
+
+      const exactMatch = this.options.find(o => o.value === this.activeValue);
+      if (exactMatch) {
+          this.selectedOptionValue = exactMatch.value;
+          return;
+      }
+
+      const roundedValue = Math.round(this.activeValue);
+      const roundedMatch = this.options.find(o => o.value === roundedValue);
+      if (roundedMatch) {
+          this.selectedOptionValue = roundedMatch.value;
+          return;
+      }
+
+      this.selectedOptionValue = this.options[0].value;
+  }
+
+  private ensureFallbackOption(): void {
+      if (this.options.length) {
+          return;
+      }
+      if (!Number.isFinite(this.activeValue)) {
+          return;
+      }
+      this.options = [{
+          value: this.activeValue,
+          label: this.activeValue.toString()
+      }];
+  }
+
+  public isOptionActive(opt: { value: number, label: string }): boolean {
+      return this.selectedOptionValue === opt.value;
+  }
+
+  public isMiddleOption(opt: { value: number, label: string }): boolean {
+      if (!this.options.length) {
+          return false;
+      }
       const index = this.options.indexOf(opt);
       const middleIndex = Math.floor(this.options.length / 2);
-
-      // If we have an odd number of items, the exact middle is green.
-      // If even, no single middle exists (or you could pick one), but standard is odd (e.g. 5 options).
-      if (this.options.length % 2 !== 0 && index === middleIndex) {
-          return 'active-0'; // Green
-      }
-      
-      return 'active-c'; // Orange for everything else
+      return this.options.length % 2 !== 0 && index === middleIndex;
+  }
+  
+  public trackByOption(index: number, opt: { value: number, label: string }): string {
+      return `${opt?.value ?? index}-${opt?.label ?? ''}`;
   }
 }

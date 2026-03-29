@@ -19,6 +19,7 @@ export * from '../miikue-dial-pretok/basic-config/miikue-dial-pretok-basic-confi
 export * from '../miikue-dial-fve/miikue-dial-fve.component';
 export * from '../miikue-dial-fve/basic-config/miikue-dial-fve-basic-config.component';
 export * from '../miikue-regulace/miikue-regulace.component';
+export * from '../miikue-regulace/basic-config/miikue-regulace-basic-config.component';
 export * from '../miikue-label/miikue-label.component';
 export * from '../miikue-value/miikue-value.component';
 export * from '../miikue-signalization/miikue-signalization.component';

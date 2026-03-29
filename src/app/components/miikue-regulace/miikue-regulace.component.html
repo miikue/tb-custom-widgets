@@ -10,8 +10,12 @@
         </div>
     </div>
     <div class="v1-switch-container">
-        <div class="v1-opt" *ngFor="let opt of options" [ngClass]="getOptionClass(opt)">
+        @for (opt of options; track trackByOption($index, opt)) {
+        <div class="v1-opt"
+             [class.active-0]="isOptionActive(opt) && isMiddleOption(opt)"
+             [class.active-c]="isOptionActive(opt) && !isMiddleOption(opt)">
             <span>{{ opt.label }}</span>
         </div>
+        }
     </div>
 </div>
