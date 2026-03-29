@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 
 @Component({
   selector: 'tb-miikue-dial-pretok',
@@ -7,20 +7,29 @@ import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges, 
 })
 export class MiikueDialPretokComponent implements OnInit, OnChanges {
 
+  private readonly defaultMaxLimit = 400;
+  private readonly defaultPDeliveryColor = '#22c55e';
+  private readonly defaultPConsumptionColor = '#f97316';
+  private readonly defaultPText = 'DODÁVKA DO SÍTĚ';
+  private readonly defaultQText = 'ODBĚR ZE SÍTĚ';
+  private readonly defaultNeutralText = 'NEČINNÉ';
+  private readonly defaultBadText = 'NEAKTUÁLNÍ DATA';
+  private readonly defaultBadColor = '#ef4444';
+
   @Input() ctx: any; // The ThingsBoard widget context
   
-  @Input() maxLimit: number = 400; // Scale limit (e.g. -400 to 400)
-  @Input() pDeliveryColor: string = '#22c55e'; // Left side (Delivery)
-  @Input() pConsumptionColor: string = '#f97316'; // Right side (Consumption)
+  maxLimit: number = this.defaultMaxLimit; // Scale limit (e.g. -400 to 400)
+  pDeliveryColor: string = this.defaultPDeliveryColor; // Left side (Delivery)
+  pConsumptionColor: string = this.defaultPConsumptionColor; // Right side (Consumption)
 
 
-  @Input() pText: string = 'DODÁVKA DO SÍTĚ';
-  @Input() qText: string = 'ODBĚR ZE SÍTĚ';
-  @Input() neutralText: string = 'NEČINNÉ';
+  pText: string = this.defaultPText;
+  qText: string = this.defaultQText;
+  neutralText: string = this.defaultNeutralText;
 
   @Input() isOk: boolean = true; // Pokud false, zobrazí se N/A a badText
-  @Input() badText: string = 'NEAKTUÁLNÍ DATA';
-  @Input() badColor: string = '#ef4444'; // Color for stale data/N/A
+  badText: string = this.defaultBadText;
+  badColor: string = this.defaultBadColor; // Color for stale data/N/A
 
   // Internal properties derived from ctx
   _pValue: number = 0; 
@@ -56,19 +65,60 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
     if (changes['ctx'] && this.ctx && this.ctx.$scope) {
         this.ctx.$scope.miikueDialWidget = this;
     }
+    this.applySettingsFromCtx();
     
     // For other input changes, refresh display
     this.refreshDisplay();
   }
 
   public onInit(): void {
+      this.applySettingsFromCtx();
       this.onDataUpdated();
   }
 
   public onDataUpdated(): void {
+      this.applySettingsFromCtx();
       this.extractDataFromCtx();
       this.refreshDisplay();
       this.cd.detectChanges();
+  }
+
+  private applySettingsFromCtx(): void {
+    const settings = this.ctx?.settings;
+    if (!settings) {
+      return;
+    }
+
+    this.maxLimit = this.pickNumberSetting(settings.maxLimit, this.maxLimit, this.defaultMaxLimit);
+    this.pDeliveryColor = this.pickStringSetting(settings.pDeliveryColor, this.pDeliveryColor, this.defaultPDeliveryColor);
+    this.pConsumptionColor = this.pickStringSetting(settings.pConsumptionColor, this.pConsumptionColor, this.defaultPConsumptionColor);
+    this.pText = this.pickStringSetting(settings.pText, this.pText, this.defaultPText);
+    this.qText = this.pickStringSetting(settings.qText, this.qText, this.defaultQText);
+    this.neutralText = this.pickStringSetting(settings.neutralText, this.neutralText, this.defaultNeutralText);
+    this.badText = this.pickStringSetting(settings.badText, this.badText, this.defaultBadText);
+    this.badColor = this.pickStringSetting(settings.badColor, this.badColor, this.defaultBadColor);
+  }
+
+  private pickStringSetting(value: any, currentValue: string, fallback: string): string {
+    if (typeof value === 'string' && value.trim().length) {
+      return value;
+    }
+    if (typeof currentValue === 'string' && currentValue.trim().length) {
+      return currentValue;
+    }
+    return fallback;
+  }
+
+  private pickNumberSetting(value: any, currentValue: number, fallback: number): number {
+    const parsedFromSettings = Number(value);
+    if (Number.isFinite(parsedFromSettings) && parsedFromSettings > 0) {
+      return parsedFromSettings;
+    }
+    const parsedCurrent = Number(currentValue);
+    if (Number.isFinite(parsedCurrent) && parsedCurrent > 0) {
+      return parsedCurrent;
+    }
+    return fallback;
   }
 
   private extractDataFromCtx(): void {
@@ -124,8 +174,13 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
     });
   }
 
+  public trackByTick(index: number, tick: any): string {
+    return `${index}-${tick?.label?.text ?? ''}`;
+  }
+
   public updateState() {
     const maxArcLength = 126;
+    const resolvedLimit = this.resolveMaxLimit();
 
     if (!this.isOk) {
         this.displayValue = 'N/A';
@@ -152,12 +207,12 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
       this.consumptionOffset = maxArcLength;
     } else if (this._pValue < 0) {
       this.statusText = this.pText;
-      const ratio = Math.min(Math.abs(this._pValue) / this.maxLimit, 1);
+      const ratio = Math.min(Math.abs(this._pValue) / resolvedLimit, 1);
       this.deliveryOffset = maxArcLength - (maxArcLength * ratio);
       this.consumptionOffset = maxArcLength;
     } else {
       this.statusText = this.qText;
-      const ratio = Math.min(Math.abs(this._pValue) / this.maxLimit, 1);
+      const ratio = Math.min(Math.abs(this._pValue) / resolvedLimit, 1);
       this.consumptionOffset = maxArcLength - (maxArcLength * ratio);
       this.deliveryOffset = maxArcLength;
     }
@@ -166,6 +221,7 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
   public generateTicks() {
     const centerX = 100;
     const centerY = 100;
+    const resolvedLimit = this.resolveMaxLimit();
     this.ticks = [];
     // 5 ticks: -Max, -Max/2, 0, Max/2, Max
     // Angles: 180, 225, 270, 315, 360
@@ -178,7 +234,7 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
     ];
 
     steps.forEach(step => {
-      const val = this.maxLimit * step.ratio;
+      const val = resolvedLimit * step.ratio;
       const angleRad = step.angle * (Math.PI / 180);
       
       // Line: r72 to r88
@@ -214,5 +270,13 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
         }
       });
     });
+  }
+
+  private resolveMaxLimit(): number {
+    const parsed = Number(this.maxLimit);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+    return this.defaultMaxLimit;
   }
 }

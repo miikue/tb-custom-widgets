@@ -1,0 +1,64 @@
+<div [formGroup]="configFormGroup">
+  <tb-datasources
+    [configMode]="basicMode"
+    hideDataKeys
+    formControlName="datasources">
+  </tb-datasources>
+
+  <tb-data-keys-panel
+    panelTitle="Body"
+    addKeyTitle="Přidat bod"
+    keySettingsTitle="Nastavení bodu"
+    removeKeyTitle="Odebrat bod"
+    noKeysText="Nejsou nastavené žádné body"
+    hideDataKeyColor
+    [datasourceType]="datasource?.type"
+    [deviceId]="datasource?.deviceId"
+    [entityAliasId]="datasource?.entityAliasId"
+    formControlName="dataKeys">
+  </tb-data-keys-panel>
+
+  <mat-form-field>
+    <mat-label>Max limit</mat-label>
+    <input matInput type="number" min="1" formControlName="maxLimit"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Delivery color</mat-label>
+    <input matInput type="color" formControlName="pDeliveryColor"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Consumption color</mat-label>
+    <input matInput type="color" formControlName="pConsumptionColor"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Delivery text</mat-label>
+    <input matInput type="text" formControlName="pText"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Consumption text</mat-label>
+    <input matInput type="text" formControlName="qText"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Neutral text</mat-label>
+    <input matInput type="text" formControlName="neutralText"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Bad text</mat-label>
+    <input matInput type="text" formControlName="badText"/>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Bad color</mat-label>
+    <input matInput type="color" formControlName="badColor"/>
+  </mat-form-field>
+
+  <tb-widget-actions-panel
+    formControlName="actions">
+  </tb-widget-actions-panel>
+</div>

@@ -14,15 +14,17 @@
           <path d="M 20 100 A 80 80 0 0 1 180 100" class="bg-arc" />
           
           <!-- Generated Ticks and Labels -->
-          <ng-container *ngFor="let tick of ticks">
-            <line [attr.x1]="tick.line.x1" [attr.y1]="tick.line.y1" 
-                  [attr.x2]="tick.line.x2" [attr.y2]="tick.line.y2" 
-                  class="center-zero-mark" /> <!-- Reusing zero-mark style as requested -->
-            
-            <text [attr.x]="tick.label.x" [attr.y]="tick.label.y" 
-                  [style.text-anchor]="tick.label.anchor"
+          @for (tick of ticks; track trackByTick($index, tick)) {
+          <g>
+            <line [attr.x1]="tick.line.x1" [attr.y1]="tick.line.y1"
+                  [attr.x2]="tick.line.x2" [attr.y2]="tick.line.y2"
+                  class="center-zero-mark" />
+
+            <text [attr.x]="tick.label.x" [attr.y]="tick.label.y"
+                  [attr.text-anchor]="tick.label.anchor"
                   class="scale-label">{{ tick.label.text }}</text>
-          </ng-container>
+          </g>
+          }
 
           <!-- Active Arcs (Static paths with dashoffset animation) -->
           <!-- Delivery Arc: Top (270) to Left (180) -->

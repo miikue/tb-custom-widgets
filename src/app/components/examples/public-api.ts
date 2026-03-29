@@ -15,6 +15,7 @@ export * from './example-chart/chart-settings/example-chart-settings.component';
 
 // Miikue Components
 export * from '../miikue-dial-pretok/miikue-dial-pretok.component';
+export * from '../miikue-dial-pretok/basic-config/miikue-dial-pretok-basic-config.component';
 export * from '../miikue-dial-fve/miikue-dial-fve.component';
 export * from '../miikue-dial-fve/basic-config/miikue-dial-fve-basic-config.component';
 export * from '../miikue-regulace/miikue-regulace.component';
