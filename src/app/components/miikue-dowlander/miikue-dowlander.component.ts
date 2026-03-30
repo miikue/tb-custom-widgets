@@ -199,7 +199,8 @@ export class MiikueDowlanderComponent implements OnInit {
   }
 
   public get selectedDeviceKeys(): string[] {
-    return this.selectedDevice?.keys || [];
+    const keys = this.selectedDevice?.keys || [];
+    return [...keys].sort((a, b) => a.localeCompare(b, 'cs', { sensitivity: 'base' }));
   }
 
   private updateExpandedState(): void {
