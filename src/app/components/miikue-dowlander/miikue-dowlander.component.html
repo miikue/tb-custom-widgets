@@ -34,6 +34,14 @@
       </div>
     </div>
 
+    <div class="controls-row">
+      <label class="field-label" for="exportTimeFormat">Formát času v CSV</label>
+      <select id="exportTimeFormat" class="field-select" [(ngModel)]="exportTimeFormat">
+        <option value="timestamp">Timestamp (výchozí)</option>
+        <option value="iso">ISO 8601 (univerzální, UTC, Z)</option>
+        <option value="readable">Čitelný (YYYY-MM-DD hh:mm:ss)</option>
+      </select>
+    </div>
     <div class="actions-row">
       <button type="button" class="export-btn" [disabled]="isExportRunning" (click)="onExportClick()">Export</button>
     </div>

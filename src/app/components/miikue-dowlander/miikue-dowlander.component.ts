@@ -1,3 +1,4 @@
+// ...existing code...
 import { Component, Input, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { WidgetContext } from '@home/models/widget-component.models';
@@ -41,6 +42,9 @@ interface CsvExportRow {
   standalone: false
 })
 export class MiikueDowlanderComponent implements OnInit {
+
+  // Formát exportovaného času v CSV: 'timestamp' | 'iso' | 'readable'
+  public exportTimeFormat: 'timestamp' | 'iso' | 'readable' = 'timestamp';
 
   @Input() ctx: WidgetContext;
 
@@ -320,10 +324,10 @@ export class MiikueDowlanderComponent implements OnInit {
   }
 
   private downloadCsvFile(fileName: string, rows: CsvExportRow[]): void {
-    const header = 'key,ts,value';
+    const header = 'key,time,value';
     const lines = rows.map((row) => {
       const key = this.escapeCsvValue(row.key);
-      const ts = this.escapeCsvValue(String(row.ts));
+      const ts = this.formatExportTime(row.ts);
       const value = this.escapeCsvValue(row.value === null ? '' : String(row.value));
       return `${key},${ts},${value}`;
     });
@@ -338,6 +342,26 @@ export class MiikueDowlanderComponent implements OnInit {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  private formatExportTime(ts: number): string {
+    if (this.exportTimeFormat === 'timestamp') {
+      return this.escapeCsvValue(String(ts));
+    } else if (this.exportTimeFormat === 'iso') {
+      return this.escapeCsvValue(new Date(ts).toISOString());
+    } else if (this.exportTimeFormat === 'readable') {
+      // YYYY-MM-DD hh:mm:ss, locale CZ
+      const d = new Date(ts);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const year = d.getFullYear();
+      const month = pad(d.getMonth() + 1);
+      const day = pad(d.getDate());
+      const hour = pad(d.getHours());
+      const min = pad(d.getMinutes());
+      const sec = pad(d.getSeconds());
+      return this.escapeCsvValue(`${year}-${month}-${day} ${hour}:${min}:${sec}`);
+    }
+    return this.escapeCsvValue(String(ts));
   }
 
   private escapeCsvValue(value: string): string {
