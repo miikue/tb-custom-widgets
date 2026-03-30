@@ -40,10 +40,10 @@ import { MiikueDialFveBasicConfigComponent } from '../miikue-dial-fve/basic-conf
 import { MiikueRegulaceComponent } from '../miikue-regulace/miikue-regulace.component';
 import { MiikueRegulaceBasicConfigComponent } from '../miikue-regulace/basic-config/miikue-regulace-basic-config.component';
 import { MiikueDowlanderComponent } from '../miikue-dowlander/miikue-dowlander.component';
-import { MiikueSignalizationComponent } from '../miikue-signalization/miikue-signalization.component';
 import { MiikueEnergieComponent } from '../miikue-energie/miikue-energie.component';
 import { MiikueCommunicationComponent } from '../miikue-communication/miikue-communication.component';
 import { MiikueStavyComponent } from '../miikue-stavy/miikue-stavy.component';
+import { MiikueNotifikationCenterComponent } from '../miikue-notifikation-center/miikue-notifikation-center.component';
 import { MiikueChartLineComponent } from '../miikue-chart-line/miikue-chart-line.component';
 import { MiikueChartLineBasicConfigComponent } from '../miikue-chart-line/chart-settings/miikue-chart-line-basic-config.component';
 import { MiikueTimeWindowSelectorComponent } from '../miikue-time-window-selector/miikue-time-window-selector.component';
@@ -76,10 +76,10 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MiikueRegulaceComponent,
     MiikueRegulaceBasicConfigComponent,
     MiikueDowlanderComponent,
-    MiikueSignalizationComponent,
     MiikueEnergieComponent,
     MiikueCommunicationComponent,
     MiikueStavyComponent,
+    MiikueNotifikationCenterComponent,
     MiikueChartLineComponent,
     MiikueChartLineBasicConfigComponent,
     MiikueTimeWindowSelectorComponent
@@ -119,10 +119,10 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MiikueRegulaceComponent,
     MiikueRegulaceBasicConfigComponent,
     MiikueDowlanderComponent,
-    MiikueSignalizationComponent,
     MiikueEnergieComponent,
     MiikueCommunicationComponent,
     MiikueStavyComponent,
+    MiikueNotifikationCenterComponent,
     MiikueChartLineComponent,
     MiikueChartLineBasicConfigComponent,
     MiikueTimeWindowSelectorComponent

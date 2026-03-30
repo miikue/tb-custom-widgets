@@ -21,10 +21,10 @@ export * from '../miikue-dial-fve/basic-config/miikue-dial-fve-basic-config.comp
 export * from '../miikue-regulace/miikue-regulace.component';
 export * from '../miikue-regulace/basic-config/miikue-regulace-basic-config.component';
 export * from '../miikue-dowlander/miikue-dowlander.component';
-export * from '../miikue-signalization/miikue-signalization.component';
 export * from '../miikue-energie/miikue-energie.component';
 export * from '../miikue-communication/miikue-communication.component';
 export * from '../miikue-stavy/miikue-stavy.component';
+export * from '../miikue-notifikation-center/miikue-notifikation-center.component';
 export * from '../miikue-chart-line/miikue-chart-line.component';
 export * from '../miikue-chart-line/chart-settings/miikue-chart-line-basic-config.component';
 export * from '../miikue-time-window-selector/miikue-time-window-selector.component';
