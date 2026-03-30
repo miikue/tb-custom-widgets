@@ -153,15 +153,14 @@ export class MiikueDowlanderComponent implements OnInit {
       return;
     }
 
-    const exportRows: CsvExportRow[] = [];
-
+    // Nová logika: tabulka time, key1, key2...
+    // 1. Načti všechny chunkData a slož mapu: ts -> { key: value }
+    const allChunkData: TimeseriesResponse[] = [];
     try {
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-
         const chunkData = await this.fetchTimeseriesChunk(selectedEntityType, selectedEntityId, selectedKeys, chunk);
-        this.appendChunkRows(exportRows, chunkData);
-
+        allChunkData.push(chunkData);
         this.exportProgressPercent = Math.round(((i + 1) / chunks.length) * 100);
         this.setExportStatus(`Pracuji... ${this.exportProgressPercent} %`, false);
         this.ctx?.detectChanges?.();
@@ -172,16 +171,36 @@ export class MiikueDowlanderComponent implements OnInit {
       return;
     }
 
-    if (!exportRows.length) {
+    // Složit mapu: ts -> { key: value }
+    const tsMap = new Map<number, Record<string, string | number | boolean | null>>();
+    const allKeys = new Set<string>(selectedKeys);
+    for (const chunkData of allChunkData) {
+      for (const key of Object.keys(chunkData)) {
+        allKeys.add(key);
+        for (const entry of chunkData[key] || []) {
+          if (typeof entry?.ts !== 'number') continue;
+          if (!tsMap.has(entry.ts)) tsMap.set(entry.ts, {});
+          tsMap.get(entry.ts)![key] = entry.value ?? '';
+        }
+      }
+    }
+
+    if (tsMap.size === 0) {
       this.isExportRunning = false;
       this.setExportStatus('Pro zvolené období nejsou dostupná data.', true);
       return;
     }
 
+    // Seřadit časy vzestupně
+    const sortedTs = Array.from(tsMap.keys()).sort((a, b) => a - b);
+    // Seřadit klíče podle abecedy
+    const sortedKeys = Array.from(allKeys).sort((a, b) => a.localeCompare(b, 'cs', { sensitivity: 'base' }));
+
+    // 2. Vygenerovat CSV
     const fileName = `export_${selectedEntityId}.csv`;
-    this.downloadCsvFile(fileName, exportRows);
+    this.downloadCsvTable(fileName, sortedTs, sortedKeys, tsMap);
     this.isExportRunning = false;
-    this.setExportStatus(`Hotovo. Staženo ${exportRows.length} řádků.`, false);
+    this.setExportStatus(`Hotovo. Staženo ${sortedTs.length} řádků.`, false);
   }
 
   public onTimeWindowChange(timeWindow: TimeWindowSelection): void {
@@ -299,37 +318,21 @@ export class MiikueDowlanderComponent implements OnInit {
     return firstValueFrom(this.http.get<TimeseriesResponse>(url));
   }
 
-  private appendChunkRows(targetRows: CsvExportRow[], chunkData: TimeseriesResponse | null | undefined): void {
-    if (!chunkData || typeof chunkData !== 'object') {
-      return;
-    }
 
-    Object.entries(chunkData).forEach(([key, values]) => {
-      if (!Array.isArray(values)) {
-        return;
+  // Již není potřeba
+
+
+  private downloadCsvTable(fileName: string, sortedTs: number[], sortedKeys: string[], tsMap: Map<number, Record<string, string | number | boolean | null>>): void {
+    // Hlavička: time, key1, key2, ...
+    const header = ['time', ...sortedKeys.map(k => this.escapeCsvValue(k))].join(',');
+    const lines = sortedTs.map(ts => {
+      const row: string[] = [this.formatExportTime(ts)];
+      const values = tsMap.get(ts) || {};
+      for (const key of sortedKeys) {
+        const val = key in values ? values[key] : '';
+        row.push(this.escapeCsvValue(val === null ? '' : String(val)));
       }
-
-      values.forEach((entry) => {
-        if (typeof entry?.ts !== 'number') {
-          return;
-        }
-
-        targetRows.push({
-          key,
-          ts: entry.ts,
-          value: entry.value ?? null
-        });
-      });
-    });
-  }
-
-  private downloadCsvFile(fileName: string, rows: CsvExportRow[]): void {
-    const header = 'key,time,value';
-    const lines = rows.map((row) => {
-      const key = this.escapeCsvValue(row.key);
-      const ts = this.formatExportTime(row.ts);
-      const value = this.escapeCsvValue(row.value === null ? '' : String(row.value));
-      return `${key},${ts},${value}`;
+      return row.join(',');
     });
     const csvContent = [header, ...lines].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
