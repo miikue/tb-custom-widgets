@@ -39,6 +39,7 @@ import { MiikueDialFveComponent } from '../miikue-dial-fve/miikue-dial-fve.compo
 import { MiikueDialFveBasicConfigComponent } from '../miikue-dial-fve/basic-config/miikue-dial-fve-basic-config.component';
 import { MiikueRegulaceComponent } from '../miikue-regulace/miikue-regulace.component';
 import { MiikueRegulaceBasicConfigComponent } from '../miikue-regulace/basic-config/miikue-regulace-basic-config.component';
+import { MiikueDowlanderComponent } from '../miikue-dowlander/miikue-dowlander.component';
 import { MiikueLabelComponent } from '../miikue-label/miikue-label.component';
 import { MiikueValueComponent } from '../miikue-value/miikue-value.component';
 import { MiikueSignalizationComponent } from '../miikue-signalization/miikue-signalization.component';
@@ -78,6 +79,7 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MiikueDialFveBasicConfigComponent,
     MiikueRegulaceComponent,
     MiikueRegulaceBasicConfigComponent,
+    MiikueDowlanderComponent,
     MiikueLabelComponent,
     MiikueValueComponent,
     MiikueSignalizationComponent,
@@ -124,6 +126,7 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MiikueDialFveBasicConfigComponent,
     MiikueRegulaceComponent,
     MiikueRegulaceBasicConfigComponent,
+    MiikueDowlanderComponent,
     MiikueLabelComponent,
     MiikueValueComponent,
     MiikueSignalizationComponent,

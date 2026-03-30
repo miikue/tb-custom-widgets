@@ -1,0 +1,51 @@
+@if (isWidgetExpanded) {
+  <div class="dowlander-wrapper">
+      <h3 class="widget-title">Export dat ve formátu CSV</h3>
+    <div class="controls-row timewindow-row">
+      <div class="field-label">Výběr časového okna</div>
+      <app-miikue-time-window-selector
+        [initialTimeWindow]="selectedTimeWindow"
+        (timeWindowChange)="onTimeWindowChange($event)">
+      </app-miikue-time-window-selector>
+    </div>
+
+    <div class="controls-row">
+      <label class="field-label" for="deviceSelect">Zařízení</label>
+      <select id="deviceSelect" class="field-select" [value]="selectedEntityId || ''" (change)="onSelectedDeviceChange($event)">
+        @for (device of datasourceEntities; track device.entityType + '-' + device.entityId) {
+          <option [value]="device.entityId">{{ device.entityName || device.entityId }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="controls-row">
+      <div class="field-label">Výběr klíčů (možnost výběru více klíčů)</div>
+      <div class="keys-list">
+        @if (selectedDeviceKeys.length) {
+          @for (key of selectedDeviceKeys; track key) {
+            <label class="key-item">
+              <input type="checkbox" [checked]="isKeySelected(key)" (change)="onKeySelectionChange(key, $any($event.target).checked)"/>
+              <span>{{ key }}</span>
+            </label>
+          }
+        } @else {
+          <div class="keys-empty">Pro vybrané zařízení nejsou dostupné klíče.</div>
+        }
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button type="button" class="export-btn" [disabled]="isExportRunning" (click)="onExportClick()">Export</button>
+    </div>
+
+    @if (exportStatusMessage) {
+      <div class="export-status" [class.error]="isExportError">
+        {{ exportStatusMessage }}
+      </div>
+    }
+  </div>
+} @else {
+  <div class="collapsed-placeholder" aria-label="Export Data Placeholder">
+    <div class="collapsed-title">Export Data</div>
+  </div>
+}
