@@ -16,9 +16,9 @@ import { DataKey, Datasource } from '@shared/public-api';
 export class MiikueRegulaceBasicConfigComponent extends BasicWidgetConfigComponent {
 
   private readonly defaults = {
-    textOn: 'AKTIVNÍ',
-    textOff: 'NEAKTIVNÍ',
-    badText: 'NEAKTUÁLNÍ DATA',
+    textOn: 'ON',
+    textOff: 'OFF',
+    badText: 'N/A',
     badColor: '#ef4444'
   };
 

@@ -7,9 +7,9 @@ import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges }
 })
 export class MiikueRegulaceComponent implements OnInit, OnChanges {
 
-    private readonly defaultTextOn = 'AKTIVNÍ';
-    private readonly defaultTextOff = 'NEAKTIVNÍ';
-    private readonly defaultBadText = 'NEAKTUÁLNÍ DATA';
+    private readonly defaultTextOn = 'ON';
+    private readonly defaultTextOff = 'OFF';
+    private readonly defaultBadText = 'N/A';
     private readonly defaultBadColor = '#ef4444';
 
   @Input() ctx: any;
