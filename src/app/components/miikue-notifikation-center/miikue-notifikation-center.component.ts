@@ -107,6 +107,10 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
     return new Date(value).toLocaleString('cs-CZ');
   }
 
+  public trackById(index: number, item: NotificationItem): string {
+    return item?.id?.id || index.toString();
+  }
+
   public isUnread(item?: NotificationItem): boolean {
     if (!item) {
       return false;
@@ -168,7 +172,6 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
   private async refreshData(): Promise<void> {
     await this.refreshUnreadCount();
     if (this.isWidgetExpanded) {
-      this.currentPage = 0; // Reset to first page on polling update
       await this.refreshNotifications();
     }
   }
@@ -322,8 +325,7 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
     
     this.isProcessingAction = true;
     try {
-      const url = `/api/notification/${itemId}`;
-      await this.apiDelete<void>(url);
+      await this.deleteNotificationById(itemId);
       
       // Remove from local list
       this.notifications = this.notifications.filter(n => n?.id?.id !== itemId);
@@ -342,21 +344,34 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
   public async deleteAllNotifications(): Promise<void> {
     this.isProcessingAction = true;
     try {
-      // Delete all by deleting each one (or use batch endpoint if available)
-      const deletePromises = this.notifications.map(n => {
-        const itemId = n?.id?.id;
-        if (itemId) {
-          return this.apiDelete<void>(`/api/notification/${itemId}`).catch(() => {});
+      // Load from page 0 repeatedly to truly delete all notifications across all pages.
+      while (true) {
+        const page = await this.apiGet<NotificationsPage>(
+          `/api/notifications?pageSize=${this.pageSize}&page=0&sortProperty=createdTime&sortOrder=DESC`
+        );
+
+        const ids = (page?.data || [])
+          .map((item) => {
+            const rawId = item?.id;
+            return typeof rawId === 'string' ? rawId : rawId?.id;
+          })
+          .filter((id): id is string => !!id);
+
+        if (ids.length === 0) {
+          break;
         }
-        return Promise.resolve();
-      });
-      
-      await Promise.all(deletePromises);
-      
-      this.notifications = [];
-      this.unreadCount = 0;
-      this.totalElements = 0;
+
+        const batchSize = 10;
+        for (let i = 0; i < ids.length; i += batchSize) {
+          const batch = ids.slice(i, i + batchSize);
+          const batchDeletes = batch.map((itemId) => this.deleteNotificationById(itemId));
+          await Promise.allSettled(batchDeletes);
+        }
+      }
+
       this.currentPage = 0;
+      await this.refreshUnreadCount();
+      await this.refreshNotifications();
       
       this.ctx?.detectChanges?.();
     } catch (error) {
@@ -364,6 +379,11 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
     } finally {
       this.isProcessingAction = false;
     }
+  }
+
+  private async deleteNotificationById(itemId: string): Promise<void> {
+    const url = `/api/notification/${itemId}`;
+    await this.apiDelete<void>(url);
   }
 
   private async apiGet<T>(url: string): Promise<T> {
