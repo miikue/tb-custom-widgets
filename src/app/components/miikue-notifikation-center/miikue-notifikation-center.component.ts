@@ -47,6 +47,7 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
   public totalElements = 0;
   public pageSize = 20;
   public isProcessingAction = false;
+  public processingItemIds = new Set<string>();
 
   private pollingId: number | null = null;
   private readonly pollingIntervalMs = 30 * 1000;
@@ -111,18 +112,20 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
     return item?.id?.id || index.toString();
   }
 
-  public isUnread(item?: NotificationItem): boolean {
+  public isItemProcessing(itemId?: string): boolean {
+    if (!itemId) {
+      return false;
+    }
+    return this.processingItemIds.has(itemId);
+  }
+
+  public isSent(item?: NotificationItem): boolean {
     if (!item) {
       return false;
     }
 
-    // ThingsBoard 4.3.1: status === 'SENT' means unread
-    if (typeof item.read === 'boolean') {
-      return item.read === false;
-    }
-
     const status = String(item.status || '').toUpperCase();
-    return status === 'SENT' || status === 'UNREAD';
+    return status === 'SENT';
   }
 
   public get totalPages(): number {
@@ -277,9 +280,9 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
   }
 
   public async markAsRead(itemId?: string): Promise<void> {
-    if (!itemId) return;
-    
-    this.isProcessingAction = true;
+    if (!itemId || this.isProcessingAction || this.isItemProcessing(itemId)) return;
+
+    this.processingItemIds.add(itemId);
     try {
       const url = `/api/notification/${itemId}/read`;
       await this.apiPut<void>(url, {});
@@ -297,7 +300,7 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('[NotifCenter] Failed to mark as read:', error);
     } finally {
-      this.isProcessingAction = false;
+      this.processingItemIds.delete(itemId);
     }
   }
 
@@ -321,9 +324,9 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
   }
 
   public async deleteNotification(itemId?: string): Promise<void> {
-    if (!itemId) return;
-    
-    this.isProcessingAction = true;
+    if (!itemId || this.isProcessingAction || this.isItemProcessing(itemId)) return;
+
+    this.processingItemIds.add(itemId);
     try {
       await this.deleteNotificationById(itemId);
       
@@ -337,7 +340,7 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('[NotifCenter] Failed to delete notification:', error);
     } finally {
-      this.isProcessingAction = false;
+      this.processingItemIds.delete(itemId);
     }
   }
 

@@ -1,7 +1,6 @@
 <div *ngIf="isWidgetExpanded; else collapsedBlock" class="notifikation-wrapper expanded">
   <div class="expanded-header">
     <div class="title">Notification Center</div>
-    <div class="unread">Nepřečtené: {{ unreadCount }}</div>
   </div>
 
   <div *ngIf="!isLoadingNotifications && notifications.length > 0" class="header-actions">
@@ -26,26 +25,25 @@
   <div *ngIf="!isLoadingNotifications && !notificationsError && notifications.length === 0" class="state-text">Žádné notifikace.</div>
 
   <div *ngIf="!isLoadingNotifications && !notificationsError && notifications.length > 0" class="list">
-    <div *ngFor="let item of notifications; trackBy: trackById" class="item" [class.unread-item]="isUnread(item)">
+    <div *ngFor="let item of notifications; trackBy: trackById" class="item" [class.unread-item]="isSent(item)">
       <div class="item-top">
         <div class="subject">{{ item?.subject || 'Notifikace' }}</div>
-        <div *ngIf="isUnread(item); else potvrzenoBlock" class="unread-badge">NEPOTVRZENO</div>
-        <ng-template #potvrzenoBlock><div style="font-size:10px;color:#64748b;">potvrzeno</div></ng-template>
+        <div *ngIf="isSent(item)" class="unread-badge">● NEPOTVRZENO</div>
         <div class="time">{{ formatNotificationTime(item?.createdTime) }}</div>
       </div>
       <div class="text">{{ item?.text || '' }}</div>
       <div class="item-actions">
-        <button *ngIf="isUnread(item)" 
+        <button *ngIf="isSent(item)" 
           class="btn-item-action" 
           (click)="markAsRead(item?.id?.id)"
-          [disabled]="isProcessingAction"
+          [disabled]="isProcessingAction || isItemProcessing(item?.id?.id)"
           title="Označit jako přečtené">
           ✓ Viděno
         </button>
         <button 
           class="btn-item-action btn-delete" 
           (click)="deleteNotification(item?.id?.id)"
-          [disabled]="isProcessingAction"
+          [disabled]="isProcessingAction || isItemProcessing(item?.id?.id)"
           title="Smazat notifikaci">
           ✕
         </button>
