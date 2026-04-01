@@ -255,7 +255,11 @@ export class MiikueDowlanderComponent implements OnInit {
       };
     }
 
-    return null;
+    const endTs = Date.now();
+    return {
+      startTs: endTs - (24 * 60 * 60 * 1000),
+      endTs
+    };
   }
 
   private fetchTimeseriesKeysForAllEntities(): void {
@@ -369,7 +373,8 @@ export class MiikueDowlanderComponent implements OnInit {
 
   private escapeCsvValue(value: string): string {
     const escaped = value.replace(/"/g, '""');
-    return `"${escaped}"`;
+    const mustBeQuoted = /[",\n\r]/.test(escaped);
+    return mustBeQuoted ? `"${escaped}"` : escaped;
   }
 
   private splitTimeWindowIntoChunks(timeWindow: TimeWindowSelection, chunkSizeMs: number = 60 * 60 * 1000): TimeChunk[] {
