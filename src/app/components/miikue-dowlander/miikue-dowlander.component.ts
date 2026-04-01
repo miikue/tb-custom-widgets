@@ -44,7 +44,7 @@ interface CsvExportRow {
 export class MiikueDowlanderComponent implements OnInit {
 
   // Formát exportovaného času v CSV: 'timestamp' | 'iso' | 'readable'
-  public exportTimeFormat: 'timestamp' | 'iso' | 'readable' = 'timestamp';
+  public exportTimeFormat: 'timestamp' | 'iso' | 'readable' = 'readable';
 
   @Input() ctx: WidgetContext;
 
@@ -58,6 +58,10 @@ export class MiikueDowlanderComponent implements OnInit {
   public exportProgressPercent = 0;
   public isExportRunning = false;
   public isExportError = false;
+  private readonly numberFormatter = new Intl.NumberFormat(
+    typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+    { useGrouping: false, maximumFractionDigits: 20 }
+  );
 
   constructor(private http: HttpClient) {}
 
@@ -191,14 +195,18 @@ export class MiikueDowlanderComponent implements OnInit {
       return;
     }
 
+    const exportTsMap = this.exportTimeFormat === 'readable'
+      ? this.mergeRowsBySecond(tsMap)
+      : tsMap;
+
     // Seřadit časy vzestupně
-    const sortedTs = Array.from(tsMap.keys()).sort((a, b) => a - b);
+    const sortedTs = Array.from(exportTsMap.keys()).sort((a, b) => a - b);
     // Seřadit klíče podle abecedy
     const sortedKeys = Array.from(allKeys).sort((a, b) => a.localeCompare(b, 'cs', { sensitivity: 'base' }));
 
     // 2. Vygenerovat CSV
     const fileName = `export_${selectedEntityId}.csv`;
-    this.downloadCsvTable(fileName, sortedTs, sortedKeys, tsMap);
+    this.downloadCsvTable(fileName, sortedTs, sortedKeys, exportTsMap);
     this.isExportRunning = false;
     this.setExportStatus(`Hotovo. Staženo ${sortedTs.length} řádků.`, false);
   }
@@ -328,15 +336,16 @@ export class MiikueDowlanderComponent implements OnInit {
 
   private downloadCsvTable(fileName: string, sortedTs: number[], sortedKeys: string[], tsMap: Map<number, Record<string, string | number | boolean | null>>): void {
     // Hlavička: time, key1, key2, ...
-    const header = ['time', ...sortedKeys.map(k => this.escapeCsvValue(k))].join(',');
+    const delimiter = ';';
+    const header = ['time', ...sortedKeys.map(k => this.escapeCsvValue(k))].join(delimiter);
     const lines = sortedTs.map(ts => {
       const row: string[] = [this.formatExportTime(ts)];
       const values = tsMap.get(ts) || {};
       for (const key of sortedKeys) {
         const val = key in values ? values[key] : '';
-        row.push(this.escapeCsvValue(val === null ? '' : String(val)));
+        row.push(this.escapeCsvValue(this.formatCsvCellValue(val)));
       }
-      return row.join(',');
+      return row.join(delimiter);
     });
     const csvContent = [header, ...lines].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -372,9 +381,42 @@ export class MiikueDowlanderComponent implements OnInit {
   }
 
   private escapeCsvValue(value: string): string {
-    const escaped = value.replace(/"/g, '""');
-    const mustBeQuoted = /[",\n\r]/.test(escaped);
-    return mustBeQuoted ? `"${escaped}"` : escaped;
+    return value
+      .replace(/;/g, ',')
+      .replace(/[\n\r]+/g, ' ')
+      .trim();
+  }
+
+  private formatCsvCellValue(value: string | number | boolean | null): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return this.numberFormatter.format(value);
+    }
+
+    return String(value);
+  }
+
+  private mergeRowsBySecond(
+    tsMap: Map<number, Record<string, string | number | boolean | null>>
+  ): Map<number, Record<string, string | number | boolean | null>> {
+    const merged = new Map<number, Record<string, string | number | boolean | null>>();
+    const sortedTs = Array.from(tsMap.keys()).sort((a, b) => a - b);
+
+    for (const ts of sortedTs) {
+      const secondTs = Math.floor(ts / 1000) * 1000;
+      const sourceRow = tsMap.get(ts) || {};
+
+      if (!merged.has(secondTs)) {
+        merged.set(secondTs, {});
+      }
+
+      Object.assign(merged.get(secondTs)!, sourceRow);
+    }
+
+    return merged;
   }
 
   private splitTimeWindowIntoChunks(timeWindow: TimeWindowSelection, chunkSizeMs: number = 60 * 60 * 1000): TimeChunk[] {
