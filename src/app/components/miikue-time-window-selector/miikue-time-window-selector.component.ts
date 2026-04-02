@@ -1,4 +1,16 @@
-import { Component, Input, OnInit, OnChanges, SimpleChanges, ChangeDetectorRef, ViewEncapsulation, output } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnInit,
+  OnChanges,
+  OnDestroy,
+  SimpleChanges,
+  ChangeDetectorRef,
+  ViewEncapsulation,
+  ElementRef,
+  Renderer2,
+  output
+} from '@angular/core';
 
 export interface TimeWindow {
   startTs: number;
@@ -20,24 +32,35 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
 
   isPopupOpen = false;
   currentSelectionText = 'Posledních 24 hodin';
-  
+
   customStartDate: string;
   customEndDate: string;
+  
   customStartTime: string;
   customEndTime: string;
 
-  private uiDebugEnabled = true;
+  private uiDebugEnabled = false;
+  private hostDashboardWidget: HTMLElement | null = null;
+  private hostDashboardWidgetOriginalZIndex: string | null = null;
 
   constructor(
-    private cd: ChangeDetectorRef
+    private cd: ChangeDetectorRef,
+    private elementRef: ElementRef<HTMLElement>,
+    private renderer: Renderer2
   ) {}
 
   ngOnInit(): void {
+    this.captureHostDashboardWidget();
+
     if (this.initialTimeWindow) {
       this.updateStateFromTimeWindow(this.initialTimeWindow);
     } else {
       this.selectQuickRange('day', false);
     }
+  }
+
+  ngOnDestroy(): void {
+    this.restoreHostDashboardWidgetLayer();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -88,6 +111,7 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
       const initial = this.initialTimeWindow || this.calculateInitialWindow();
       this.updateStateFromTimeWindow(initial);
       this.isPopupOpen = true;
+      this.elevateHostDashboardWidgetLayer();
     }
     if (this.uiDebugEnabled) {
       console.warn('[TW UI] popup state changed', { isPopupOpenAfter: this.isPopupOpen });
@@ -145,7 +169,9 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
       this.timeWindowChange.emit(newTimeWindow);
     }
     this.updateStateFromTimeWindow(newTimeWindow);
-    // Keep popup open so user can fine-tune date/time fields after quick selection.
+    if (emitChange && this.isPopupOpen) {
+      this.closePopup();
+    }
     this.cd.detectChanges();
   }
 
@@ -166,7 +192,7 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
       const newTimeWindow = { startTs: finalStartDate.getTime(), endTs: finalEndDate.getTime() };
       this.timeWindowChange.emit(newTimeWindow);
       this.updateStateFromTimeWindow(newTimeWindow, false);
-      this.isPopupOpen = false;
+      this.closePopup();
     } else {
       alert('Neplatný časový rozsah. Datum "Od" musí být dříve než datum "Do".');
     }
@@ -179,12 +205,51 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
       newDate.setHours(hours, minutes, 0, 0);
       return newDate;
   }
+
+  onStartDateChange(event: any): void {
+    if (event && event instanceof Date) {
+      this.customStartDate = this.formatDateForInput(event);
+    }
+  }
+
+  onEndDateChange(event: any): void {
+    if (event && event instanceof Date) {
+      this.customEndDate = this.formatDateForInput(event);
+    }
+  }
   
   closePopup() {
     if (this.uiDebugEnabled) {
       console.warn('[TW UI] closePopup');
     }
     this.isPopupOpen = false;
+    this.restoreHostDashboardWidgetLayer();
+  }
+
+  private captureHostDashboardWidget(): void {
+    const host = this.elementRef.nativeElement;
+    this.hostDashboardWidget = host.closest('.grid-stack-item') as HTMLElement | null;
+    if (this.hostDashboardWidget) {
+      this.hostDashboardWidgetOriginalZIndex = this.hostDashboardWidget.style.zIndex || null;
+    }
+  }
+
+  private elevateHostDashboardWidgetLayer(): void {
+    if (!this.hostDashboardWidget) {
+      return;
+    }
+    this.renderer.setStyle(this.hostDashboardWidget, 'z-index', '20000');
+  }
+
+  private restoreHostDashboardWidgetLayer(): void {
+    if (!this.hostDashboardWidget) {
+      return;
+    }
+    if (this.hostDashboardWidgetOriginalZIndex) {
+      this.renderer.setStyle(this.hostDashboardWidget, 'z-index', this.hostDashboardWidgetOriginalZIndex);
+    } else {
+      this.renderer.removeStyle(this.hostDashboardWidget, 'z-index');
+    }
   }
 
   private updateDisplay(timeWindow: TimeWindow, label?: string) {
@@ -208,5 +273,9 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  onDateInputChange(): void {
+    // Inputs are bound via ngModel; keep this hook for template compatibility.
   }
 }

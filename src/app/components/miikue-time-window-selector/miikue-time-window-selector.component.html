@@ -26,11 +26,11 @@
           <div class="calendar-container">
             <div class="form-group date-inputs">
               <label for="tw-start-date">Datum od</label>
-              <input id="tw-start-date" type="date" class="datetime-input" [(ngModel)]="customStartDate">
+              <input id="tw-start-date" type="date" class="datetime-input" [(ngModel)]="customStartDate" (change)="onDateInputChange()">
             </div>
             <div class="form-group date-inputs">
               <label for="tw-end-date">Datum do</label>
-              <input id="tw-end-date" type="date" class="datetime-input" [(ngModel)]="customEndDate">
+              <input id="tw-end-date" type="date" class="datetime-input" [(ngModel)]="customEndDate" (change)="onDateInputChange()">
             </div>
           </div>
           <div class="time-and-actions">

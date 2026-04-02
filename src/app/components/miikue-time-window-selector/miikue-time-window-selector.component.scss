@@ -8,7 +8,24 @@
   z-index: 5;
 }
 .calendar-container{
-  width: 300px;
+  width: 100%;
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.calendar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.calendar-label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+  text-align: center;
 }
 
 .time-window-selector .display-button {
@@ -35,7 +52,7 @@
 .popup-container {
   position: fixed;
   inset: 0;
-  z-index: 5000;
+  z-index: 30000;
   display: flex;
   align-items: center;
   justify-content: center;
