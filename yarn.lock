@@ -5196,12 +5196,13 @@ dunder-proto@^1.0.0, dunder-proto@^1.0.1:
     es-errors "^1.3.0"
     gopd "^1.2.0"
 
-"echarts@https://github.com/thingsboard/echarts/archive/5.5.2-TB.tar.gz":
-  version "5.5.2-TB"
-  resolved "https://github.com/thingsboard/echarts/archive/5.5.2-TB.tar.gz#779494c24fb5448ecaf79315bf609bb52b431df9"
+echarts@^6.0.0:
+  version "6.0.0"
+  resolved "https://registry.yarnpkg.com/echarts/-/echarts-6.0.0.tgz#2935aa7751c282d1abbbf7d719d397199a15b9e7"
+  integrity sha512-Tte/grDQRiETQP4xz3iZWSvoHrkCQtwqd6hs+mifXcjrCuo2iKWbajFObuLJVBlDIJlOzgQPd1hsaKt/3+OMkQ==
   dependencies:
     tslib "2.3.0"
-    zrender "https://github.com/thingsboard/zrender/archive/5.5.0-TB.tar.gz"
+    zrender "6.0.0"
 
 ee-first@1.1.1:
   version "1.1.1"
@@ -7638,6 +7639,13 @@ ngx-drag-drop@^20.0.1:
   version "20.0.1"
   resolved "https://registry.yarnpkg.com/ngx-drag-drop/-/ngx-drag-drop-20.0.1.tgz#e8ddb8ee35225d500e7aec84c60ea3aef9f87dec"
   integrity sha512-RYhZiLF+MiBv6xRwZwkdZBMxi6qP41hg7T/WMcvXsS6hwuSMJp7zFea2LYHFPgzGBWo1zNp+xzedXDivfaMOMw==
+  dependencies:
+    tslib "^2.3.0"
+
+ngx-echarts@20:
+  version "20.0.2"
+  resolved "https://registry.yarnpkg.com/ngx-echarts/-/ngx-echarts-20.0.2.tgz#028affcbed1f81d7aeaa7f0a5c9c75831d1e1507"
+  integrity sha512-kDoIFp7SrWCPWG9nX9IX9ARnIh4f5p8VYtRWvhXwlf5gW+GxUbeDKYpvIvBVjaftudLZIMwZ/N4GADQSIus57Q==
   dependencies:
     tslib "^2.3.0"
 
@@ -10318,8 +10326,9 @@ zone.js@~0.15.1:
   resolved "https://registry.yarnpkg.com/zone.js/-/zone.js-0.15.1.tgz#1e109adb75f80e9e004ee8e0d4a0a52e0a336481"
   integrity sha512-XE96n56IQpJM7NAoXswY3XRLcWFW83xe0BiAOeMD7K5k5xecOeul3Qcpx6GqEeeHNkW5DWL5zOyTbEfB4eti8w==
 
-"zrender@https://github.com/thingsboard/zrender/archive/5.5.0-TB.tar.gz":
-  version "5.5.0-TB"
-  resolved "https://github.com/thingsboard/zrender/archive/5.5.0-TB.tar.gz#9605f08284436a9be86085e27f1c01b29a9923bf"
+zrender@6.0.0:
+  version "6.0.0"
+  resolved "https://registry.yarnpkg.com/zrender/-/zrender-6.0.0.tgz#947077bc69cdea744134984927f132f3727f8079"
+  integrity sha512-41dFXEEXuJpNecuUQq6JlbybmnHaqqpGlbH1yxnA5V9MMP4SbohSVZsJIwz+zdjQXSSlR1Vc34EgH1zxyTDvhg==
   dependencies:
     tslib "2.3.0"

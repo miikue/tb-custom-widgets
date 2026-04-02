@@ -1,0 +1,13 @@
+.miikue-chart {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.miikue-chart__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}

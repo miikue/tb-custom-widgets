@@ -47,12 +47,15 @@ import { MiikueNotifikationCenterComponent } from '../miikue-notifikation-center
 import { MiikueChartLineComponent } from '../miikue-chart-line/miikue-chart-line.component';
 import { MiikueChartLineBasicConfigComponent } from '../miikue-chart-line/chart-settings/miikue-chart-line-basic-config.component';
 import { MiikueTimeWindowSelectorComponent } from '../miikue-time-window-selector/miikue-time-window-selector.component';
+import { MiikueChartEngineComponent } from '../miikue-chart-engine/miikue-chart-engine.component';
+import { MiikueChartComponent } from '../miikue-chart/miikue-chart.component';
 
 // Angular Material Modules for Date Picker
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
+import { FormsModule } from '@angular/forms';
 
 
 @NgModule({
@@ -82,7 +85,9 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MiikueNotifikationCenterComponent,
     MiikueChartLineComponent,
     MiikueChartLineBasicConfigComponent,
-    MiikueTimeWindowSelectorComponent
+    MiikueTimeWindowSelectorComponent,
+    MiikueChartEngineComponent,
+    MiikueChartComponent
   ],
   imports: [
     CommonModule,
@@ -96,7 +101,8 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MatDatepickerModule,
     MatFormFieldModule,
     MatInputModule,
-    MatNativeDateModule
+    MatNativeDateModule,
+    FormsModule
   ],
   exports: [
     ExampleTableComponent,
@@ -125,7 +131,9 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
     MiikueNotifikationCenterComponent,
     MiikueChartLineComponent,
     MiikueChartLineBasicConfigComponent,
-    MiikueTimeWindowSelectorComponent
+    MiikueTimeWindowSelectorComponent,
+    MiikueChartEngineComponent,
+    MiikueChartComponent
   ],
     providers: [
     { provide: MAT_DATE_LOCALE, useValue: 'cs-CZ' }

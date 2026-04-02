@@ -28,3 +28,5 @@ export * from '../miikue-notifikation-center/miikue-notifikation-center.componen
 export * from '../miikue-chart-line/miikue-chart-line.component';
 export * from '../miikue-chart-line/chart-settings/miikue-chart-line-basic-config.component';
 export * from '../miikue-time-window-selector/miikue-time-window-selector.component';
+export * from '../miikue-chart-engine/miikue-chart-engine.component';
+export * from '../miikue-chart/miikue-chart.component';

@@ -1,0 +1,10 @@
+<div class="miikue-chart">
+  <div class="miikue-chart__toolbar">
+    <app-miikue-time-window-selector
+      [initialTimeWindow]="selectedTimeWindow"
+      (timeWindowChange)="onTimeWindowChange($event)">
+    </app-miikue-time-window-selector>
+  </div>
+
+  <tb-miikue-chart-engine [ctx]="engineCtx"></tb-miikue-chart-engine>
+</div>

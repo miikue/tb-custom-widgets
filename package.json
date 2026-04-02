@@ -18,10 +18,11 @@
   },
   "dependencies": {
     "chart.js": "3.3.2",
-    "echarts": "https://github.com/thingsboard/echarts/archive/5.5.2-TB.tar.gz",
+    "echarts": "^6.0.0",
     "flot": "https://github.com/thingsboard/flot.git#0.9-work",
     "flot.curvedlines": "https://github.com/MichaelZinsmaier/CurvedLines.git#master",
     "moment": "^2.30.1",
+    "ngx-echarts": "20",
     "primeicons": "~7.0.0",
     "primeng": "~20.4.0",
     "tinycolor2": "^1.6.0"
@@ -46,8 +47,8 @@
     "@angular/router": "20.3.18",
     "@ngrx/store": "^20.1.0",
     "@ngx-translate/core": "^17.0.0",
-    "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-replace": "6.0.3",
     "@rollup/plugin-terser": "1.0.0",
     "@tb/custom-builder": "file:./builders",
