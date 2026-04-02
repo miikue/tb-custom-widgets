@@ -15,6 +15,7 @@ export interface ChartDataPoint {
 
 interface MiikueChartEngineCtx extends Partial<WidgetContext> {
   chartData?: ChartDataPoint[];
+  aggregationMode?: 'seconds' | 'min' | 'hour';
 }
 
 @Component({
@@ -30,11 +31,13 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   @Input() ctx: MiikueChartEngineCtx;
 
   private chart: any = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private windowResizeListener: (() => void) | null = null;
 
   chartOption: any = {};
 
   constructor(private cdr: ChangeDetectorRef) {
-    console.log('[MiikueChartEngine] Constructor called');
+    //console.log('[MiikueChartEngine] Constructor called');
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -45,7 +48,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   }
 
   ngAfterViewInit() {
-    console.log('[MiikueChartEngine] ngAfterViewInit - initializing chart');
+    //console.log('[MiikueChartEngine] ngAfterViewInit - initializing chart');
     this.initializeChart();
     this.cdr.detectChanges();
     console.log(this.ctx);
@@ -58,21 +61,30 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     }
 
     const chartElement = this.chartContainer.nativeElement;
-    console.log('[MiikueChartEngine] Chart element:', chartElement);
+    //console.log('[MiikueChartEngine] Chart element:', chartElement);
 
     // Initialize echarts
     this.chart = echarts.init(chartElement, null, { renderer: 'canvas' });
-    console.log('[MiikueChartEngine] Chart instance created:', this.chart);
+    //console.log('[MiikueChartEngine] Chart instance created:', this.chart);
 
     // Set initial options
     this.updateChart();
 
-    // Handle resize
-    window.addEventListener('resize', () => {
+    // Handle window resize
+    this.windowResizeListener = () => {
+      if (this.chart) {
+        this.chart.resize();
+      }
+    };
+    window.addEventListener('resize', this.windowResizeListener);
+
+    // Handle container resize with ResizeObserver
+    this.resizeObserver = new ResizeObserver(() => {
       if (this.chart) {
         this.chart.resize();
       }
     });
+    this.resizeObserver.observe(chartElement);
   }
 
   private updateChart() {
@@ -141,6 +153,13 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       legend: {
         data: Array.from(seriesMap.keys())
       },
+      grid: {
+        left: 48,
+        right: 16,
+        top: 44,
+        bottom: 40,
+        containLabel: true
+      },
       xAxis: {
         type: 'category',
         data: xAxisLabels
@@ -157,6 +176,19 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   }
 
   ngOnDestroy() {
+    // Clean up resize observer
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+
+    // Clean up window resize listener
+    if (this.windowResizeListener) {
+      window.removeEventListener('resize', this.windowResizeListener);
+      this.windowResizeListener = null;
+    }
+
+    // Dispose chart
     if (this.chart) {
       this.chart.dispose();
       this.chart = null;

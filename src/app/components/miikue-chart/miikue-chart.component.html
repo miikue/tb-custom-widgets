@@ -4,6 +4,17 @@
       [initialTimeWindow]="selectedTimeWindow"
       (timeWindowChange)="onTimeWindowChange($event)">
     </app-miikue-time-window-selector>
+    
+    <div class="miikue-chart__aggregation-selector">
+      <button
+        *ngFor="let mode of aggregationModes"
+        type="button"
+        class="miikue-chart__aggregation-btn"
+        [class.active]="selectedAggregationMode === mode.value"
+        (click)="onAggregationModeChange(mode.value)">
+        {{ mode.label }}
+      </button>
+    </div>
   </div>
 
   <tb-miikue-chart-engine [ctx]="engineCtx"></tb-miikue-chart-engine>
