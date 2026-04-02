@@ -906,6 +906,9 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   private setupXAxis(): XAXisOption {
     const activeTimeWindow = this.getActiveTimeWindow();
     const now = Date.now();
+    const minTime = activeTimeWindow?.minTime ?? (now - 24 * 60 * 60 * 1000);
+    const maxTime = activeTimeWindow?.maxTime ?? now;
+    
     return {
       id: 'xAxis',
       mainType: 'xAxis',
@@ -915,8 +918,8 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
       name: '',
       offset: 0,
       nameLocation: 'middle',
-      max: activeTimeWindow?.maxTime ?? now,
-      min: activeTimeWindow?.minTime ?? (now - 24 * 60 * 60 * 1000),
+      max: Math.max(minTime, maxTime),
+      min: Math.min(minTime, maxTime),
       nameTextStyle: {
         color: 'rgba(0, 0, 0, 0.54)',
         fontStyle: 'normal',
@@ -953,6 +956,27 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
         fontWeight: 400,
         show: true,
         hideOverlap: true,
+        formatter: (value: any) => {
+          if (value == null) {
+            return '';
+          }
+          try {
+            const date = new Date(Number(value));
+            if (isNaN(date.getTime())) {
+              return String(value);
+            }
+            return date.toLocaleString('en-GB', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            });
+          } catch (e) {
+            return String(value);
+          }
+        }
       }
     }
   }
