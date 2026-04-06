@@ -11,11 +11,16 @@ export interface ChartDataPoint {
   ts: number;
   value: number;
   name: string;
+  color?: string;
 }
 
 interface MiikueChartEngineCtx extends Partial<WidgetContext> {
   chartData?: ChartDataPoint[];
   aggregationMode?: 'seconds' | 'min' | 'hour';
+  selectedTimeWindow?: {
+    startTs: number;
+    endTs: number;
+  };
 }
 
 type AggregationMode = 'seconds' | 'min' | 'hour';
@@ -37,6 +42,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   private resizeObserver: ResizeObserver | null = null;
   private windowResizeListener: (() => void) | null = null;
   private rawSeriesMap = new Map<string, SeriesPoint[]>();
+  private seriesColorMap = new Map<string, string>();
   private fullRangeMinTs: number | null = null;
   private fullRangeMaxTs: number | null = null;
   private readonly maxPointsPerPixel = 1.25;
@@ -103,10 +109,11 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   private updateChart() {
     const chartData = this.ctx?.chartData || [];
 
-    if (!this.chart || !chartData.length) {
-      console.log('[MiikueChartEngine] No data to display');
+    if (!this.chart) {
       return;
     }
+
+    const xRange = this.resolveConfiguredXAxisRange(chartData);
 
     console.log('[MiikueChartEngine] updateChart - processing', chartData.length, 'data points');
 
@@ -118,6 +125,9 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
         seriesMap.set(point.name, []);
       }
       seriesMap.get(point.name)!.push({ ts: point.ts, value: point.value });
+      if (point.color && !this.seriesColorMap.has(point.name)) {
+        this.seriesColorMap.set(point.name, point.color);
+      }
     }
 
     // Sort each series by timestamp
@@ -126,8 +136,15 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     }
 
     this.rawSeriesMap.clear();
+    this.seriesColorMap.clear();
     this.fullRangeMinTs = null;
     this.fullRangeMaxTs = null;
+
+    for (const point of chartData) {
+      if (point.color && !this.seriesColorMap.has(point.name)) {
+        this.seriesColorMap.set(point.name, point.color);
+      }
+    }
 
     for (const [name, dataPoints] of seriesMap.entries()) {
       const points: SeriesPoint[] = this.buildSeriesWithGapBreaks(dataPoints);
@@ -147,6 +164,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
 
     for (const [name, points] of this.rawSeriesMap.entries()) {
       const seriesValues = this.decimateForCurrentWidth(points);
+      const seriesColor = this.seriesColorMap.get(name) || colors[colorIndex % colors.length];
 
       echartsSeriesData.push({
         name: name,
@@ -154,12 +172,12 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
         data: seriesValues,
         symbol: 'circle',
         showSymbol: true,
-        symbolSize: 6,
+        symbolSize: 4,
         connectNulls: false,
         smooth: false,
-        lineStyle: { color: colors[colorIndex % colors.length] },
+        lineStyle: { color: seriesColor },
         itemStyle: {
-          color: colors[colorIndex % colors.length],
+          color: seriesColor,
           borderWidth: 0
         }
       });
@@ -181,6 +199,12 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
           dataZoom: {
             yAxisIndex: 'none'
           },
+          myZoomOutAll: {
+            show: true,
+            title: 'Zoom out full',
+            icon: 'path://M128 480h768v64H128zM256 320h512v64H256zM384 160h256v64H384z',
+            onclick: () => this.zoomOutToFullRange()
+          },
           saveAsImage: {
             type: 'png',
             pixelRatio: 2,
@@ -201,6 +225,8 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       },
       xAxis: {
         type: 'time',
+        min: xRange.minTs,
+        max: xRange.maxTs,
         axisLabel: {
           formatter: (value: number) => new Date(value).toLocaleString('cs-CZ')
         }
@@ -225,8 +251,43 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     };
 
     // Set option
-    this.chart.setOption(this.chartOption);
+    this.chart.setOption(this.chartOption, { notMerge: true });
     console.log('[MiikueChartEngine] Chart option set');
+  }
+
+  private resolveConfiguredXAxisRange(chartData: ChartDataPoint[]): { minTs?: number; maxTs?: number } {
+    const selectedWindow = this.ctx?.selectedTimeWindow;
+    const startTs = Number(selectedWindow?.startTs);
+    const endTs = Number(selectedWindow?.endTs);
+
+    if (Number.isFinite(startTs) && Number.isFinite(endTs)) {
+      return {
+        minTs: Math.min(startTs, endTs),
+        maxTs: Math.max(startTs, endTs)
+      };
+    }
+
+    if (!chartData.length) {
+      return {};
+    }
+
+    let minTs = chartData[0].ts;
+    let maxTs = chartData[0].ts;
+    for (const point of chartData) {
+      minTs = Math.min(minTs, point.ts);
+      maxTs = Math.max(maxTs, point.ts);
+    }
+
+    return { minTs, maxTs };
+  }
+
+  private zoomOutToFullRange(): void {
+    if (!this.chart) {
+      return;
+    }
+
+    this.chart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 });
+    this.applyDecimatedSeriesForCurrentView();
   }
 
   private applyDecimatedSeriesForCurrentView(): void {
@@ -242,18 +303,19 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     for (const [name, points] of this.rawSeriesMap.entries()) {
       const inRange = this.filterByRange(points, visible.minTs, visible.maxTs);
       const decimated = this.decimateForCurrentWidth(inRange);
+      const seriesColor = this.seriesColorMap.get(name) || colors[colorIndex % colors.length];
       updatedSeries.push({
         name,
         type: 'line',
         data: decimated,
         symbol: 'circle',
         showSymbol: true,
-        symbolSize: 6,
+        symbolSize: 4,
         connectNulls: false,
         smooth: false,
-        lineStyle: { color: colors[colorIndex % colors.length] },
+        lineStyle: { color: seriesColor },
         itemStyle: {
-          color: colors[colorIndex % colors.length],
+          color: seriesColor,
           borderWidth: 0
         }
       });

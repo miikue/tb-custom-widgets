@@ -37,6 +37,7 @@ export class MiikueChartComponent implements OnInit {
   labels: string[] = [];
   keys: string[] = [];
   private keyToLabel = new Map<string, string>();
+  private keyToColor = new Map<string, string>();
   private fetchSequence = 0;
   private readonly maxConcurrentChunkRequests = 8;
   private modeCache: Record<AggregationMode, ModeCache> = {
@@ -81,6 +82,7 @@ export class MiikueChartComponent implements OnInit {
     this.keys = [];
     this.labels = [];
     this.keyToLabel.clear();
+    this.keyToColor.clear();
 
     const dataEntries = (this.ctx as any)?.data || [];
     for (const entry of dataEntries) {
@@ -89,9 +91,13 @@ export class MiikueChartComponent implements OnInit {
         continue;
       }
       const label = entry?.dataKey?.label || key;
+      const color = entry?.dataKey?.color;
       this.keys.push(key);
       this.labels.push(label);
       this.keyToLabel.set(key, label);
+      if (color) {
+        this.keyToColor.set(key, color);
+      }
     }
   }
 
@@ -363,7 +369,8 @@ export class MiikueChartComponent implements OnInit {
         .map((item) => ({
           ts: Number(item.ts),
           value: Number(item.value),
-          name: seriesName
+          name: seriesName,
+          color: this.keyToColor.get(baseKey)
         }))
         .filter((item) => Number.isFinite(item.ts) && Number.isFinite(item.value));
     } catch (error) {
@@ -377,7 +384,8 @@ export class MiikueChartComponent implements OnInit {
     this.engineCtx = {
       ...(this.ctx || {}),
       chartData: this.chartData,
-      aggregationMode: this.selectedAggregationMode
+      aggregationMode: this.selectedAggregationMode,
+      selectedTimeWindow: this.selectedTimeWindow
     };
   }
 
