@@ -153,6 +153,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     }
 
     const xRange = this.resolveConfiguredXAxisRange(chartData);
+    const chartBackground = this.resolveChartBackground();
 
     this.rawSeriesMap.clear();
     this.seriesColorMap.clear();
@@ -230,6 +231,8 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
 
     // Create chart option
     this.chartOption = {
+      backgroundColor: chartBackground,
+      darkMode: false,
       tooltip: {
         trigger: 'axis'
       },
@@ -251,7 +254,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
           saveAsImage: {
             type: 'png',
             pixelRatio: 2,
-            backgroundColor: '#ffffff',
+            backgroundColor: chartBackground === 'transparent' ? '#ffffff' : chartBackground,
             name: 'miikue-chart'
           }
         }
@@ -260,7 +263,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
         data: legendData
       },
       grid: {
-        left: 48,
+        left: 24,
         right: 16,
         top: 44,
         bottom: 40,
@@ -304,7 +307,10 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     }
 
     const xRange = this.resolveConfiguredXAxisRange([]);
+    const chartBackground = this.resolveChartBackground();
     const chartOption = {
+      backgroundColor: chartBackground,
+      darkMode: false,
       tooltip: {
         trigger: 'axis'
       },
@@ -514,7 +520,10 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       };
     });
 
+    const chartBackground = this.resolveChartBackground();
     this.chartOption = {
+      backgroundColor: chartBackground,
+      darkMode: false,
       tooltip: {
         trigger: 'axis'
       },
@@ -547,6 +556,10 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       this.chartWorker = null;
     }
     this.workerReady = false;
+  }
+
+  private resolveChartBackground(): string {
+    return '#ffffff';
   }
 
   private resolveVisibleRange(): { minTs: number | null; maxTs: number | null } {
