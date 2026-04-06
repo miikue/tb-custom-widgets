@@ -1,6 +1,6 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, ViewChild } from '@angular/core';
 import { WidgetContext } from '@home/models/widget-component.models';
-import { ChartDataPoint } from '../miikue-chart-engine/miikue-chart-engine.component';
+import { ChartDataPoint, MiikueChartEngineComponent } from '../miikue-chart-engine/miikue-chart-engine.component';
 import { TimeWindow } from '../miikue-time-window-selector/miikue-time-window-selector.component';
 import { firstValueFrom } from 'rxjs';
 
@@ -21,6 +21,7 @@ interface ModeCache {
 export class MiikueChartComponent implements OnInit {
 
   @Input() ctx: WidgetContext;
+  @ViewChild(MiikueChartEngineComponent) chartEngine?: MiikueChartEngineComponent;
 
   engineCtx: any = {};
   chartData: ChartDataPoint[] = [];
@@ -77,6 +78,22 @@ export class MiikueChartComponent implements OnInit {
     this.selectedAggregationMode = mode;
     // Reload data with new aggregation mode (different API keys)
     await this.loadChartDataForCurrentWindow();
+  }
+
+  onZoomSelectToggle(): void {
+    this.chartEngine?.toggleZoomSelection();
+  }
+
+  onZoomBack(): void {
+    this.chartEngine?.zoomBackOneStep();
+  }
+
+  onZoomOutFull(): void {
+    this.chartEngine?.zoomOutToFullRange();
+  }
+
+  onSavePng(): void {
+    this.chartEngine?.saveAsPng();
   }
 
   private initializeKeysAndLabels(): void {

@@ -70,6 +70,9 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   private workerReady = false;
   private workerRequestSeq = 0;
   private latestRenderRequestId = 0;
+  private zoomSelectionActive = false;
+  private zoomHistory: Array<{ start: number; end: number }> = [{ start: 0, end: 100 }];
+  private lastZoomRange = { start: 0, end: 100 };
 
   chartOption: any = {};
 
@@ -110,6 +113,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     this.updateChart();
 
     this.chart.on('dataZoom', () => {
+      this.trackZoomHistory();
       this.applyDecimatedSeriesForCurrentView();
     });
 
@@ -233,16 +237,15 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     this.chartOption = {
       backgroundColor: chartBackground,
       darkMode: false,
-      tooltip: {
-        trigger: 'axis'
-      },
+      tooltip: this.buildTooltipOption(),
       toolbox: {
         show: true,
-        right: 8,
-        top: 8,
-        itemSize: 16,
+        left: -1000,
+        top: -1000,
+        itemSize: 1,
         feature: {
           dataZoom: {
+            xAxisIndex: [0],
             yAxisIndex: 'none'
           },
           myZoomOutAll: {
@@ -259,13 +262,11 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
           }
         }
       },
-      legend: {
-        data: legendData
-      },
+      legend: this.buildLegendOption(legendData),
       grid: {
         left: 24,
         right: 16,
-        top: 44,
+        top: 30,
         bottom: 40,
         containLabel: true
       },
@@ -274,7 +275,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
         min: xRange.minTs,
         max: xRange.maxTs,
         axisLabel: {
-          formatter: (value: number) => new Date(value).toLocaleString('cs-CZ')
+          formatter: (value: number) => this.formatXAxisLabel(value)
         }
       },
       yAxis: {
@@ -298,6 +299,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
 
     // Set option
     this.chart.setOption(this.chartOption, { notMerge: true });
+    this.resetZoomTracking();
     console.log('[MiikueChartEngine] Chart option set');
   }
 
@@ -311,20 +313,16 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     const chartOption = {
       backgroundColor: chartBackground,
       darkMode: false,
-      tooltip: {
-        trigger: 'axis'
-      },
+      tooltip: this.buildTooltipOption(),
       toolbox: this.chartOption.toolbox,
-      legend: {
-        data: []
-      },
+      legend: this.buildLegendOption([]),
       grid: this.chartOption.grid,
       xAxis: {
         type: 'time',
         min: xRange.minTs,
         max: xRange.maxTs,
         axisLabel: {
-          formatter: (value: number) => new Date(value).toLocaleString('cs-CZ')
+          formatter: (value: number) => this.formatXAxisLabel(value)
         }
       },
       yAxis: {
@@ -336,6 +334,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
 
     this.chartOption = chartOption;
     this.chart.setOption(this.chartOption, { notMerge: true });
+    this.resetZoomTracking();
   }
 
   private resolveConfiguredXAxisRange(chartData: ChartDataPoint[]): { minTs?: number; maxTs?: number } {
@@ -364,13 +363,66 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     return { minTs, maxTs };
   }
 
-  private zoomOutToFullRange(): void {
+  public zoomOutToFullRange(): void {
     if (!this.chart) {
       return;
     }
 
     this.chart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 });
+    this.lastZoomRange = { start: 0, end: 100 };
+    if (!this.zoomHistory.length || this.zoomHistory[this.zoomHistory.length - 1].start !== 0 || this.zoomHistory[this.zoomHistory.length - 1].end !== 100) {
+      this.zoomHistory.push({ start: 0, end: 100 });
+    }
     this.applyDecimatedSeriesForCurrentView();
+  }
+
+  public zoomBackOneStep(): void {
+    if (!this.chart) {
+      return;
+    }
+
+    if (this.zoomHistory.length <= 1) {
+      this.zoomOutToFullRange();
+      return;
+    }
+
+    this.zoomHistory.pop();
+    const previous = this.zoomHistory[this.zoomHistory.length - 1] || { start: 0, end: 100 };
+    this.lastZoomRange = { start: previous.start, end: previous.end };
+    this.chart.dispatchAction({ type: 'dataZoom', start: previous.start, end: previous.end });
+    this.applyDecimatedSeriesForCurrentView();
+  }
+
+  public toggleZoomSelection(): void {
+    if (!this.chart) {
+      return;
+    }
+
+    this.zoomSelectionActive = !this.zoomSelectionActive;
+    this.chart.dispatchAction({
+      type: 'takeGlobalCursor',
+      key: 'dataZoomSelect',
+      dataZoomSelectActive: this.zoomSelectionActive
+    });
+
+    this.chart.getZr().setCursorStyle(this.zoomSelectionActive ? 'crosshair' : 'default');
+  }
+
+  public saveAsPng(): void {
+    if (!this.chart) {
+      return;
+    }
+
+    const dataUrl = this.chart.getDataURL({
+      type: 'png',
+      pixelRatio: 2,
+      backgroundColor: '#ffffff'
+    });
+
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = 'miikue-chart.png';
+    link.click();
   }
 
   private applyDecimatedSeriesForCurrentView(): void {
@@ -524,20 +576,16 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     this.chartOption = {
       backgroundColor: chartBackground,
       darkMode: false,
-      tooltip: {
-        trigger: 'axis'
-      },
+      tooltip: this.buildTooltipOption(),
       toolbox: this.chartOption.toolbox,
-      legend: {
-        data: result.series.map((series) => series.name)
-      },
+      legend: this.buildLegendOption(result.series.map((series) => series.name)),
       grid: this.chartOption.grid,
       xAxis: {
         type: 'time',
         min: result.xRange?.minTs,
         max: result.xRange?.maxTs,
         axisLabel: {
-          formatter: (value: number) => new Date(value).toLocaleString('cs-CZ')
+          formatter: (value: number) => this.formatXAxisLabel(value)
         }
       },
       yAxis: {
@@ -548,6 +596,135 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     };
 
     this.chart.setOption(this.chartOption, { notMerge: true });
+    this.resetZoomTracking();
+  }
+
+  private buildLegendOption(data: string[]): any {
+    return {
+      type: 'scroll',
+      orient: 'horizontal',
+      top: 0,
+      left: 8,
+      right: 8,
+      itemWidth: 10,
+      itemHeight: 10,
+      itemGap: 10,
+      pageIconColor: '#1976d2',
+      pageIconInactiveColor: 'rgba(0, 0, 0, 0.28)',
+      pageTextStyle: {
+        color: 'rgba(0, 0, 0, 0.65)',
+        fontSize: 11
+      },
+      textStyle: {
+        color: 'rgba(0, 0, 0, 0.78)',
+        fontSize: 11
+      },
+      formatter: (name: string) => this.truncateLegendLabel(name),
+      data
+    };
+  }
+
+  private buildTooltipOption(): any {
+    return {
+      trigger: 'axis',
+      confine: true,
+      formatter: (params: any) => this.formatTooltip(params)
+    };
+  }
+
+  private formatTooltip(params: any): string {
+    const items = Array.isArray(params) ? params : [params];
+    if (!items.length) {
+      return '';
+    }
+
+    const firstValue = Array.isArray(items[0]?.value) ? items[0].value[0] : items[0]?.axisValue;
+    const ts = Number(firstValue);
+    const header = Number.isFinite(ts)
+      ? new Date(ts).toLocaleString('cs-CZ')
+      : String(firstValue ?? '');
+
+    const validItems = items.filter((item: any) => {
+      const value = Array.isArray(item?.value) ? item.value[1] : item?.value;
+      return value !== null && value !== undefined && value !== '-';
+    });
+
+    if (!validItems.length) {
+      return `${header}<br/>Bez dat`;
+    }
+
+    const lines = validItems.map((item: any) => {
+      const marker = item?.marker || '';
+      const name = item?.seriesName || '';
+      const value = Array.isArray(item?.value) ? item.value[1] : item?.value;
+      return `${marker}${name}: ${value}`;
+    });
+
+    return [header, ...lines].join('<br/>');
+  }
+
+  private truncateLegendLabel(value: string, maxLength = 22): string {
+    const text = String(value || '');
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return `${text.slice(0, Math.max(0, maxLength - 1))}…`;
+  }
+
+  private formatXAxisLabel(value: number): string {
+    const date = new Date(Number(value));
+    if (isNaN(date.getTime())) {
+      return String(value ?? '');
+    }
+
+    return date.toLocaleString('cs-CZ', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  }
+
+  private getCurrentZoomRange(): { start: number; end: number } {
+    const option = this.chart?.getOption?.() || {};
+    const dataZoom = Array.isArray(option.dataZoom) && option.dataZoom.length ? option.dataZoom[0] : null;
+    const start = Number(dataZoom?.start);
+    const end = Number(dataZoom?.end);
+    return {
+      start: Number.isFinite(start) ? start : 0,
+      end: Number.isFinite(end) ? end : 100
+    };
+  }
+
+  private trackZoomHistory(): void {
+    const current = this.getCurrentZoomRange();
+    if (current.start === this.lastZoomRange.start && current.end === this.lastZoomRange.end) {
+      return;
+    }
+
+    this.lastZoomRange = { start: current.start, end: current.end };
+    const last = this.zoomHistory[this.zoomHistory.length - 1];
+    if (!last || last.start !== current.start || last.end !== current.end) {
+      this.zoomHistory.push({ start: current.start, end: current.end });
+      if (this.zoomHistory.length > 30) {
+        this.zoomHistory.shift();
+      }
+    }
+  }
+
+  private resetZoomTracking(): void {
+    this.zoomHistory = [{ start: 0, end: 100 }];
+    this.lastZoomRange = { start: 0, end: 100 };
+    this.zoomSelectionActive = false;
+    if (this.chart) {
+      this.chart.dispatchAction({
+        type: 'takeGlobalCursor',
+        key: 'dataZoomSelect',
+        dataZoomSelectActive: false
+      });
+      this.chart.getZr().setCursorStyle('default');
+    }
   }
 
   private disposeWorker(): void {

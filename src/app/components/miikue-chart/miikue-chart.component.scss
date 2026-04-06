@@ -12,7 +12,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
     background: #ffffff;
 }
 
@@ -20,9 +20,31 @@
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: space-between;
     gap: 16px;
     background: #ffffff;
+    padding: 2px 8px 0;
+}
+
+.miikue-chart__toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 0 0 auto;
+}
+
+.miikue-chart__toolbar-center {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+}
+
+.miikue-chart__toolbar-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 0 auto;
 }
 
 .miikue-chart > tb-miikue-chart-engine {
@@ -34,6 +56,13 @@
 .miikue-chart__aggregation-selector {
     display: flex;
     gap: 6px;
+}
+
+.miikue-chart__action-selector {
+    display: flex;
+    gap: 6px;
+    padding-left: 12px;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .miikue-chart__aggregation-btn {
@@ -65,7 +94,9 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 210px;
+    min-width: 240px;
+    max-width: 420px;
+    width: 100%;
 }
 
 .miikue-chart__loading-text {
@@ -87,4 +118,30 @@
     width: 0;
     background: #1976d2;
     transition: width 0.15s ease;
+}
+
+.miikue-chart__icon-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: white;
+    color: rgba(0, 0, 0, 0.7);
+    border-radius: 3px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+
+    &:hover {
+        background: rgba(0, 0, 0, 0.02);
+        border-color: rgba(0, 0, 0, 0.2);
+    }
+
+    svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+    }
 }
