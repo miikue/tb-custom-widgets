@@ -29,6 +29,7 @@ export class MiikueChartComponent implements OnInit {
   isLoading = false;
   loadingProgressPercent = 0;
   loadingMessage = '';
+  private loadingMessagePrefix = '';
   readonly aggregationModes: Array<{ value: AggregationMode; label: string }> = [
     { value: 'seconds', label: 'Surová data' },
     { value: 'min', label: 'Agregace min' },
@@ -110,10 +111,13 @@ export class MiikueChartComponent implements OnInit {
     const { startTs, endTs } = this.selectedTimeWindow;
     const normalizedStartTs = Math.min(startTs, endTs);
     const normalizedEndTs = Math.max(startTs, endTs);
+    const windowDurationMs = normalizedEndTs - normalizedStartTs;
     const fetchId = ++this.fetchSequence;
     const cache = this.modeCache[mode];
 
-    const missingRanges = this.resolveMissingRanges(cache, normalizedStartTs, normalizedEndTs);
+    const fetchStartTs = this.resolveFetchWindowStart(mode, normalizedStartTs, normalizedEndTs, windowDurationMs);
+    this.loadingMessagePrefix = this.buildLoadingPrefix(mode, normalizedStartTs, normalizedEndTs, fetchStartTs);
+    const missingRanges = this.resolveMissingRanges(cache, fetchStartTs, normalizedEndTs);
     const requestFactories: Array<() => Promise<ChartDataPoint[]>> = [];
 
     for (const range of missingRanges) {
@@ -160,7 +164,7 @@ export class MiikueChartComponent implements OnInit {
       return;
     }
 
-    this.chartData = this.getCachedPointsInRange(cache, normalizedStartTs, normalizedEndTs);
+    this.chartData = this.getCachedPointsInRange(cache, fetchStartTs, normalizedEndTs);
     this.prepareEngineCtx();
     this.ctx?.detectChanges?.();
   }
@@ -177,6 +181,41 @@ export class MiikueChartComponent implements OnInit {
       default:
         // Raw samples are chunked by hour.
         return 60 * 60 * 1000;
+    }
+  }
+
+  private resolveFetchWindowStart(mode: AggregationMode, startTs: number, endTs: number, windowDurationMs: number): number {
+    const monthMs = 31 * 24 * 60 * 60 * 1000;
+    const yearMs = 365 * 24 * 60 * 60 * 1000;
+
+    switch (mode) {
+      case 'seconds':
+        return windowDurationMs > monthMs ? Math.max(startTs, endTs - monthMs + 1) : startTs;
+      case 'min':
+        return windowDurationMs > yearMs ? Math.max(startTs, endTs - yearMs + 1) : startTs;
+      case 'hour':
+      default:
+        return startTs;
+    }
+  }
+
+  private buildLoadingPrefix(mode: AggregationMode, fullStartTs: number, fullEndTs: number, fetchStartTs: number): string {
+    const totalMs = Math.max(1, fullEndTs - fullStartTs + 1);
+    const fetchedMs = Math.max(1, fullEndTs - fetchStartTs + 1);
+    const fetchedPercent = Math.min(100, Math.max(1, Math.round((fetchedMs / totalMs) * 100)));
+
+    if (fetchStartTs > fullStartTs) {
+      return `Tahám v limitu (${fetchedPercent} % okna)`;
+    }
+
+    switch (mode) {
+      case 'seconds':
+        return 'Načítám raw data';
+      case 'min':
+        return 'Načítám minutová data';
+      case 'hour':
+      default:
+        return 'Načítám hodinová data';
     }
   }
 
@@ -294,20 +333,20 @@ export class MiikueChartComponent implements OnInit {
   private startLoading(totalRequests: number): void {
     this.isLoading = true;
     this.loadingProgressPercent = 0;
-    this.loadingMessage = `Nacitam 0% z intervalu (${totalRequests} requestu)`;
+    this.loadingMessage = `${this.loadingMessagePrefix} (0 % requestů)`;
     this.ctx?.detectChanges?.();
   }
 
   private updateLoadingProgress(completed: number, total: number): void {
     const safeTotal = Math.max(1, total);
     this.loadingProgressPercent = Math.min(100, Math.round((completed / safeTotal) * 100));
-    this.loadingMessage = `Nacitam ${this.loadingProgressPercent}% z intervalu (${completed}/${total})`;
+    this.loadingMessage = `${this.loadingMessagePrefix} (${this.loadingProgressPercent} % requestů)`;
     this.ctx?.detectChanges?.();
   }
 
   private finishLoading(): void {
     this.loadingProgressPercent = 100;
-    this.loadingMessage = 'Nacitam 100% z intervalu';
+    this.loadingMessage = `${this.loadingMessagePrefix} (100 % requestů)`;
     this.isLoading = false;
     this.ctx?.detectChanges?.();
   }
@@ -316,6 +355,7 @@ export class MiikueChartComponent implements OnInit {
     this.isLoading = false;
     this.loadingProgressPercent = 0;
     this.loadingMessage = '';
+    this.loadingMessagePrefix = '';
   }
 
   private resolvePrimaryDatasource(): { entityType: string; entityId: string } | null {

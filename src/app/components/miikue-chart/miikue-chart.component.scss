@@ -31,9 +31,6 @@
 .miikue-chart__aggregation-selector {
     display: flex;
     gap: 6px;
-    padding: 4px;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 4px;
 }
 
 .miikue-chart__aggregation-btn {
@@ -46,6 +43,8 @@
     font-size: 12px;
     font-weight: 500;
     transition: all 0.2s ease;
+    min-height: 30px;
+    line-height: 1;
     
     &:hover {
         background: rgba(0, 0, 0, 0.02);
