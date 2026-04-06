@@ -6,6 +6,12 @@ import { firstValueFrom } from 'rxjs';
 
 type AggregationMode = 'seconds' | 'min' | 'hour';
 
+interface ModeCache {
+  coveredStartTs: number | null;
+  coveredEndTs: number | null;
+  pointsByKey: Map<string, ChartDataPoint>;
+}
+
 @Component({
   selector: 'tb-miikue-chart',
   templateUrl: './miikue-chart.component.html',
@@ -20,6 +26,9 @@ export class MiikueChartComponent implements OnInit {
   chartData: ChartDataPoint[] = [];
   selectedTimeWindow: TimeWindow;
   selectedAggregationMode: AggregationMode = 'seconds';
+  isLoading = false;
+  loadingProgressPercent = 0;
+  loadingMessage = '';
   readonly aggregationModes: Array<{ value: AggregationMode; label: string }> = [
     { value: 'seconds', label: 'Surová data' },
     { value: 'min', label: 'Agregace min' },
@@ -29,6 +38,12 @@ export class MiikueChartComponent implements OnInit {
   keys: string[] = [];
   private keyToLabel = new Map<string, string>();
   private fetchSequence = 0;
+  private readonly maxConcurrentChunkRequests = 8;
+  private modeCache: Record<AggregationMode, ModeCache> = {
+    seconds: this.createEmptyModeCache(),
+    min: this.createEmptyModeCache(),
+    hour: this.createEmptyModeCache()
+  };
 
   async ngOnInit() {
     console.log('[MiikueChart] ngOnInit - loading data from API');
@@ -85,19 +100,216 @@ export class MiikueChartComponent implements OnInit {
       return;
     }
 
+    const mode = this.selectedAggregationMode;
     const { startTs, endTs } = this.selectedTimeWindow;
+    const normalizedStartTs = Math.min(startTs, endTs);
+    const normalizedEndTs = Math.max(startTs, endTs);
     const fetchId = ++this.fetchSequence;
+    const cache = this.modeCache[mode];
 
-    const requests = this.keys.map((key) => this.apiGetTimeseriesData(key, startTs, endTs));
-    const responseChunks = await Promise.all(requests);
+    const missingRanges = this.resolveMissingRanges(cache, normalizedStartTs, normalizedEndTs);
+    const requestFactories: Array<() => Promise<ChartDataPoint[]>> = [];
+
+    for (const range of missingRanges) {
+      const chunks = this.buildTimeChunks(range.startTs, range.endTs, this.resolveChunkSizeMs(mode));
+      for (const key of this.keys) {
+        for (const chunk of chunks) {
+          requestFactories.push(() => this.apiGetTimeseriesData(key, chunk.startTs, chunk.endTs, mode));
+        }
+      }
+    }
+
+    if (requestFactories.length) {
+      this.startLoading(requestFactories.length);
+      try {
+        const responseChunks = await this.runWithConcurrencyLimit(
+          requestFactories,
+          this.maxConcurrentChunkRequests,
+          (completed, total) => {
+            if (fetchId === this.fetchSequence) {
+              this.updateLoadingProgress(completed, total);
+            }
+          }
+        );
+
+        if (fetchId !== this.fetchSequence) {
+          return;
+        }
+
+        const incomingPoints = this.mergeChartData(responseChunks.flat());
+        this.appendToCache(cache, incomingPoints);
+        for (const range of missingRanges) {
+          this.expandCoveredRange(cache, range.startTs, range.endTs);
+        }
+      } finally {
+        if (fetchId === this.fetchSequence) {
+          this.finishLoading();
+        }
+      }
+    } else {
+      this.resetLoading();
+    }
 
     if (fetchId !== this.fetchSequence) {
       return;
     }
 
-    this.chartData = responseChunks.flat();
+    this.chartData = this.getCachedPointsInRange(cache, normalizedStartTs, normalizedEndTs);
     this.prepareEngineCtx();
     this.ctx?.detectChanges?.();
+  }
+
+  private resolveChunkSizeMs(mode: AggregationMode): number {
+    switch (mode) {
+      case 'min':
+        // Minute aggregations are chunked by day.
+        return 24 * 60 * 60 * 1000;
+      case 'hour':
+        // Hour aggregations are chunked by week.
+        return 7 * 24 * 60 * 60 * 1000;
+      case 'seconds':
+      default:
+        // Raw samples are chunked by hour.
+        return 60 * 60 * 1000;
+    }
+  }
+
+  private buildTimeChunks(startTs: number, endTs: number, chunkSizeMs: number): Array<{ startTs: number; endTs: number }> {
+    const normalizedStart = Math.min(startTs, endTs);
+    const normalizedEnd = Math.max(startTs, endTs);
+    const chunks: Array<{ startTs: number; endTs: number }> = [];
+
+    let currentStart = normalizedStart;
+    while (currentStart <= normalizedEnd) {
+      const currentEnd = Math.min(currentStart + chunkSizeMs - 1, normalizedEnd);
+      chunks.push({ startTs: currentStart, endTs: currentEnd });
+      currentStart = currentEnd + 1;
+    }
+
+    return chunks;
+  }
+
+  private createEmptyModeCache(): ModeCache {
+    return {
+      coveredStartTs: null,
+      coveredEndTs: null,
+      pointsByKey: new Map<string, ChartDataPoint>()
+    };
+  }
+
+  private resolveMissingRanges(cache: ModeCache, startTs: number, endTs: number): Array<{ startTs: number; endTs: number }> {
+    if (cache.coveredStartTs == null || cache.coveredEndTs == null) {
+      return [{ startTs, endTs }];
+    }
+
+    const missing: Array<{ startTs: number; endTs: number }> = [];
+
+    if (startTs < cache.coveredStartTs) {
+      missing.push({
+        startTs,
+        endTs: Math.min(endTs, cache.coveredStartTs - 1)
+      });
+    }
+
+    if (endTs > cache.coveredEndTs) {
+      missing.push({
+        startTs: Math.max(startTs, cache.coveredEndTs + 1),
+        endTs
+      });
+    }
+
+    return missing.filter((range) => range.startTs <= range.endTs);
+  }
+
+  private appendToCache(cache: ModeCache, points: ChartDataPoint[]): void {
+    for (const point of points) {
+      cache.pointsByKey.set(`${point.name}|${point.ts}`, point);
+    }
+  }
+
+  private expandCoveredRange(cache: ModeCache, startTs: number, endTs: number): void {
+    if (cache.coveredStartTs == null || cache.coveredEndTs == null) {
+      cache.coveredStartTs = startTs;
+      cache.coveredEndTs = endTs;
+      return;
+    }
+
+    cache.coveredStartTs = Math.min(cache.coveredStartTs, startTs);
+    cache.coveredEndTs = Math.max(cache.coveredEndTs, endTs);
+  }
+
+  private getCachedPointsInRange(cache: ModeCache, startTs: number, endTs: number): ChartDataPoint[] {
+    const points: ChartDataPoint[] = [];
+    for (const point of cache.pointsByKey.values()) {
+      if (point.ts >= startTs && point.ts <= endTs) {
+        points.push(point);
+      }
+    }
+    return points.sort((a, b) => a.ts - b.ts);
+  }
+
+  private async runWithConcurrencyLimit<T>(
+    requestFactories: Array<() => Promise<T>>,
+    limit: number,
+    onProgress?: (completed: number, total: number) => void
+  ): Promise<T[]> {
+    if (!requestFactories.length) {
+      return [];
+    }
+
+    const results: T[] = [];
+    let index = 0;
+    let completed = 0;
+    const total = requestFactories.length;
+
+    const workers = Array.from({ length: Math.min(limit, requestFactories.length) }, async () => {
+      while (index < requestFactories.length) {
+        const current = index++;
+        results[current] = await requestFactories[current]();
+        completed += 1;
+        onProgress?.(completed, total);
+      }
+    });
+
+    await Promise.all(workers);
+    return results;
+  }
+
+  private mergeChartData(points: ChartDataPoint[]): ChartDataPoint[] {
+    const uniquePoints = new Map<string, ChartDataPoint>();
+
+    for (const point of points) {
+      uniquePoints.set(`${point.name}|${point.ts}`, point);
+    }
+
+    return Array.from(uniquePoints.values()).sort((a, b) => a.ts - b.ts);
+  }
+
+  private startLoading(totalRequests: number): void {
+    this.isLoading = true;
+    this.loadingProgressPercent = 0;
+    this.loadingMessage = `Nacitam 0% z intervalu (${totalRequests} requestu)`;
+    this.ctx?.detectChanges?.();
+  }
+
+  private updateLoadingProgress(completed: number, total: number): void {
+    const safeTotal = Math.max(1, total);
+    this.loadingProgressPercent = Math.min(100, Math.round((completed / safeTotal) * 100));
+    this.loadingMessage = `Nacitam ${this.loadingProgressPercent}% z intervalu (${completed}/${total})`;
+    this.ctx?.detectChanges?.();
+  }
+
+  private finishLoading(): void {
+    this.loadingProgressPercent = 100;
+    this.loadingMessage = 'Nacitam 100% z intervalu';
+    this.isLoading = false;
+    this.ctx?.detectChanges?.();
+  }
+
+  private resetLoading(): void {
+    this.isLoading = false;
+    this.loadingProgressPercent = 0;
+    this.loadingMessage = '';
   }
 
   private resolvePrimaryDatasource(): { entityType: string; entityId: string } | null {
@@ -123,7 +335,7 @@ export class MiikueChartComponent implements OnInit {
     return firstValueFrom(ctxHttp.get(url));
   }
 
-  private async apiGetTimeseriesData(baseKey: string, startTs: number, endTs: number): Promise<ChartDataPoint[]> {
+  private async apiGetTimeseriesData(baseKey: string, startTs: number, endTs: number, mode: AggregationMode): Promise<ChartDataPoint[]> {
     const source = this.resolvePrimaryDatasource();
     if (!source) {
       console.warn('[MiikueChart] Missing datasource entity info, cannot load API data');
@@ -131,7 +343,7 @@ export class MiikueChartComponent implements OnInit {
     }
 
     // Append aggregation suffix to the key based on selected mode
-    const apiKey = this.getAggregatedKey(baseKey);
+    const apiKey = this.getAggregatedKey(baseKey, mode);
 
     const url = `/api/plugins/telemetry/${source.entityType}/${source.entityId}/values/timeseries`
       + `?keys=${encodeURIComponent(apiKey)}`
@@ -170,8 +382,8 @@ export class MiikueChartComponent implements OnInit {
   }
 
   // Get API key with aggregation suffix based on selected mode
-  private getAggregatedKey(baseKey: string): string {
-    switch (this.selectedAggregationMode) {
+  private getAggregatedKey(baseKey: string, mode: AggregationMode): string {
+    switch (mode) {
       case 'min':
         return `${baseKey}_min`;
       case 'hour':

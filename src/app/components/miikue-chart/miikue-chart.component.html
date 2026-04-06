@@ -15,6 +15,13 @@
         {{ mode.label }}
       </button>
     </div>
+
+    <div class="miikue-chart__loading" *ngIf="isLoading">
+      <span class="miikue-chart__loading-text">{{ loadingMessage }}</span>
+      <div class="miikue-chart__loading-bar">
+        <div class="miikue-chart__loading-bar-fill" [style.width.%]="loadingProgressPercent"></div>
+      </div>
+    </div>
   </div>
 
   <tb-miikue-chart-engine [ctx]="engineCtx"></tb-miikue-chart-engine>
