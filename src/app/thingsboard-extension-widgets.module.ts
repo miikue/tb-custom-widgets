@@ -7,6 +7,8 @@ import { TranslateService } from '@ngx-translate/core';
 import addCustomWidgetLocale from './locale/custom-widget-locale.constant';
 import { CommonModule } from '@angular/common';
 import { ExamplesModule } from './components/examples/examples.module';
+import { CommonComponentsModule } from './components/common/common.module';
+import { EnergieComponentsModule } from './components/energie/energie.module';
 import { addLibraryStyles } from './scss/lib-styles';
 
 import * as echarts from 'echarts/core';
@@ -21,10 +23,15 @@ echarts.use([BarChart, LineChart, PieChart, CanvasRenderer, SVGRenderer, GridCom
   declarations: [],
   imports: [
     CommonModule,
+    CommonComponentsModule,
+    ExamplesModule,
+    EnergieComponentsModule,
     NgxEchartsModule.forRoot({echarts})
   ],
   exports: [
+    CommonComponentsModule,
     ExamplesModule,
+    EnergieComponentsModule,
     NgxEchartsModule
   ]
 })

@@ -1,0 +1,23 @@
+graf nemá hodiny a zoom out zemí osu na min když byl na hodinách 
+
+energie:
+datové body: 
+energie denní a celková
+výroba fve
++- kam teče energie (+ bereme ze sítě)
+
+flow chart jak to aktuálně teče
+graf výroby po hodinách
+
+
+
+
+
+
+
+
+
+
+
+Hotovo pro energie
+    - vytvořit calkulace import a export
