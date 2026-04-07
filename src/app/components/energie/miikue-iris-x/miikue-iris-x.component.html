@@ -1,0 +1,62 @@
+<div class="iris-x">
+  <div class="iris-x__bg-glow"></div>
+
+  <div class="iris-x__diagram">
+    <svg class="iris-x__paths" viewBox="0 0 1000 640" preserveAspectRatio="none" aria-hidden="true">
+      <path id="path-fve-grid" class="flow flow--fve-grid" d="M500 130 L250 470"></path>
+      <path id="path-fve-home" class="flow flow--fve-home" d="M500 130 L750 470"></path>
+      <path id="path-grid-home" class="flow flow--grid-home" d="M250 470 L750 470"></path>
+
+      <g class="flow-bubbles">
+        <circle
+          *ngFor="let bubble of flowBubbles; trackBy: trackByBubble"
+          class="flow-bubble"
+          [ngClass]="'flow-bubble--' + bubble.edge"
+          [attr.r]="bubble.sizePx / 2"
+        >
+          <animateMotion
+            [attr.dur]="bubble.durationSec + 's'"
+            [attr.begin]="bubble.beginSec + 's'"
+            repeatCount="indefinite"
+            rotate="auto"
+          >
+            <mpath [attr.xlink:href]="'#path-' + bubble.edge"></mpath>
+          </animateMotion>
+          <animate
+            attributeName="opacity"
+            values="0;1;1;0"
+            keyTimes="0;0.12;0.88;1"
+            [attr.dur]="bubble.durationSec + 's'"
+            [attr.begin]="bubble.beginSec + 's'"
+            repeatCount="indefinite"
+          ></animate>
+        </circle>
+      </g>
+    </svg>
+
+    <section class="energy-node energy-node--fve" aria-label="FVE">
+      <div class="energy-node__ring">
+        <div class="energy-node__icon" aria-hidden="true">&#9728;</div>
+        <div class="energy-node__name">FVE</div>
+        <div class="energy-node__value">{{ fveValueText }} {{ valueUnitText }}</div>
+      </div>
+    </section>
+
+    <section class="energy-node energy-node--grid" aria-label="Distribucni sit">
+      <div class="energy-node__ring">
+        <div class="energy-node__icon" aria-hidden="true">&#9889;</div>
+        <div class="energy-node__name">Distribucni sit</div>
+        <div class="energy-node__value" [class.energy-node__value--export]="isGridExport">{{ gridValueText }} {{ valueUnitText }}</div>
+        <div class="energy-node__hint">{{ gridFlowText }}</div>
+      </div>
+    </section>
+
+    <section class="energy-node energy-node--home" aria-label="Doma">
+      <div class="energy-node__ring">
+        <div class="energy-node__icon" aria-hidden="true">&#8962;</div>
+        <div class="energy-node__name">Doma</div>
+        <div class="energy-node__value">{{ homeValueText }} {{ valueUnitText }}</div>
+      </div>
+    </section>
+  </div>
+</div>
