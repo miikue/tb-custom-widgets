@@ -8,7 +8,6 @@
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 320px;
   overflow: hidden;
   background: #ffffff;
 }
@@ -27,7 +26,6 @@
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 320px;
 }
 
 .iris-x__paths {
@@ -83,8 +81,6 @@
 
 .energy-node {
   position: absolute;
-  width: clamp(128px, 20vw, 178px);
-  aspect-ratio: 1;
   z-index: 3;
 }
 
@@ -100,27 +96,54 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 12px;
+  padding: 8px;
   color: var(--text-main);
   animation: node-rise 540ms ease both;
 }
 
 .energy-node__icon {
-  font-size: clamp(20px, 3vw, 28px);
-  line-height: 1;
-  margin-bottom: 6px;
+  width: 20px;
+  height: 20px;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.energy-node__icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.energy-node__label-block {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: max-content;
+  text-align: center;
+}
+
+.energy-node__label-block--top {
+  bottom: calc(100% + 6px);
+}
+
+.energy-node__label-block--bottom {
+  top: calc(100% + 6px);
 }
 
 .energy-node__name {
-  font-size: clamp(12px, 1.4vw, 14px);
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-soft);
   letter-spacing: 0.03em;
+  line-height: 1.2;
 }
 
 .energy-node__value {
   margin-top: 2px;
-  font-size: clamp(18px, 2.4vw, 30px);
+  font-size: 12px;
   font-weight: 800;
   line-height: 1.1;
 }
@@ -130,35 +153,26 @@
 }
 
 .energy-node__hint {
-  margin-top: 4px;
-  font-size: clamp(11px, 1.2vw, 13px);
+  margin-top: 2px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-soft);
+  line-height: 1.2;
 }
 
 .energy-node--fve {
-  left: 50%;
-  top: 4%;
-  transform: translateX(-50%);
-
   .energy-node__ring {
     border-color: var(--fve);
   }
 }
 
 .energy-node--grid {
-  left: 12%;
-  top: 58%;
-
   .energy-node__ring {
     border-color: var(--grid);
   }
 }
 
 .energy-node--home {
-  right: 12%;
-  top: 58%;
-
   .energy-node__ring {
     border-color: var(--home);
   }
@@ -186,50 +200,5 @@
   }
 }
 
-@media (max-width: 760px) {
-  .energy-node {
-    width: clamp(110px, 28vw, 154px);
-  }
-
-  .energy-node--fve {
-    top: 3%;
-  }
-
-  .energy-node--grid {
-    left: 6%;
-    top: 60%;
-  }
-
-  .energy-node--home {
-    right: 6%;
-    top: 60%;
-  }
-}
-
 @media (max-width: 560px) {
-  .iris-x {
-    min-height: 430px;
-  }
-
-  .energy-node--fve {
-    left: 50%;
-    top: 6%;
-    transform: translateX(-50%);
-  }
-
-  .energy-node--grid {
-    left: 2%;
-    top: 64%;
-  }
-
-  .energy-node--home {
-    right: 2%;
-    top: 64%;
-    left: auto;
-    transform: none;
-  }
-
-  .energy-node__value {
-    font-size: clamp(16px, 5.1vw, 24px);
-  }
 }

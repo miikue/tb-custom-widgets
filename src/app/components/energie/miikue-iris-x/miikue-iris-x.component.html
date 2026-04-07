@@ -1,11 +1,11 @@
 <div class="iris-x">
   <div class="iris-x__bg-glow"></div>
 
-  <div class="iris-x__diagram">
-    <svg class="iris-x__paths" viewBox="0 0 1000 640" preserveAspectRatio="none" aria-hidden="true">
-      <path id="path-fve-grid" class="flow flow--fve-grid" d="M500 130 L250 470"></path>
-      <path id="path-fve-home" class="flow flow--fve-home" d="M500 130 L750 470"></path>
-      <path id="path-grid-home" class="flow flow--grid-home" d="M250 470 L750 470"></path>
+  <div #diagramRef class="iris-x__diagram">
+    <svg class="iris-x__paths" [attr.viewBox]="'0 0 ' + diagramWidth + ' ' + diagramHeight" preserveAspectRatio="none" aria-hidden="true">
+      <path id="path-fve-grid" class="flow flow--fve-grid" [attr.d]="fveToGridPath"></path>
+      <path id="path-fve-home" class="flow flow--fve-home" [attr.d]="fveToHomePath"></path>
+      <path id="path-grid-home" class="flow flow--grid-home" [attr.d]="gridToHomePath"></path>
 
       <g class="flow-bubbles">
         <circle
@@ -34,28 +34,54 @@
       </g>
     </svg>
 
-    <section class="energy-node energy-node--fve" aria-label="FVE">
+    <section class="energy-node energy-node--fve" aria-label="FVE" [style.left.px]="fveNodeLeft" [style.top.px]="fveNodeTop" [style.width.px]="nodeDiameterPx" [style.height.px]="nodeDiameterPx">
       <div class="energy-node__ring">
-        <div class="energy-node__icon" aria-hidden="true">&#9728;</div>
-        <div class="energy-node__name">FVE</div>
+        <div class="energy-node__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"></circle>
+            <path d="M12 2.5V5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M12 19V21.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M2.5 12H5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M19 12H21.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M5.3 5.3L7.1 7.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M16.9 16.9L18.7 18.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M16.9 7.1L18.7 5.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M5.3 18.7L7.1 16.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+        </div>
         <div class="energy-node__value">{{ fveValueText }} {{ valueUnitText }}</div>
+      </div>
+      <div class="energy-node__label-block energy-node__label-block--top">
+        <div class="energy-node__name">FVE</div>
       </div>
     </section>
 
-    <section class="energy-node energy-node--grid" aria-label="Distribucni sit">
+    <section class="energy-node energy-node--grid" aria-label="Distribucni sit" [style.left.px]="gridNodeLeft" [style.top.px]="gridNodeTop" [style.width.px]="nodeDiameterPx" [style.height.px]="nodeDiameterPx">
       <div class="energy-node__ring">
-        <div class="energy-node__icon" aria-hidden="true">&#9889;</div>
-        <div class="energy-node__name">Distribucni sit</div>
+        <div class="energy-node__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13.5 2.5L5.8 13.3H11L10.5 21.5L18.2 10.7H13L13.5 2.5Z" fill="currentColor"></path>
+          </svg>
+        </div>
         <div class="energy-node__value" [class.energy-node__value--export]="isGridExport">{{ gridValueText }} {{ valueUnitText }}</div>
+      </div>
+      <div class="energy-node__label-block energy-node__label-block--bottom">
+        <div class="energy-node__name">Distribucni sit</div>
         <div class="energy-node__hint">{{ gridFlowText }}</div>
       </div>
     </section>
 
-    <section class="energy-node energy-node--home" aria-label="Doma">
+    <section class="energy-node energy-node--home" aria-label="Spotreba" [style.left.px]="homeNodeLeft" [style.top.px]="homeNodeTop" [style.width.px]="nodeDiameterPx" [style.height.px]="nodeDiameterPx">
       <div class="energy-node__ring">
-        <div class="energy-node__icon" aria-hidden="true">&#8962;</div>
-        <div class="energy-node__name">Doma</div>
+        <div class="energy-node__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 10.2L12 3.5L20 10.2V20.5H14.5V14.8H9.5V20.5H4V10.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+          </svg>
+        </div>
         <div class="energy-node__value">{{ homeValueText }} {{ valueUnitText }}</div>
+      </div>
+      <div class="energy-node__label-block energy-node__label-block--bottom">
+        <div class="energy-node__name">Spotreba</div>
       </div>
     </section>
   </div>

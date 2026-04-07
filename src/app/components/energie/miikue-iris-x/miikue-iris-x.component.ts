@@ -1,4 +1,15 @@
-import { ChangeDetectorRef, Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  Input,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  SimpleChanges,
+  ViewChild
+} from '@angular/core';
 
 type FlowEdge = 'fve-grid' | 'fve-home' | 'grid-home';
 
@@ -19,19 +30,47 @@ interface FlowBubble {
 export class MiikueIrisXComponent implements OnInit, OnChanges {
 
   @Input() ctx: any;
+  @ViewChild('diagramRef', { static: true }) diagramRef!: ElementRef<HTMLElement>;
 
   fvePower = 0;
   gridPowerAbs = 0;
   homePower = 0;
   flowBubbles: FlowBubble[] = [];
 
+  diagramWidth = 1000;
+  diagramHeight = 640;
+  nodeDiameterPx = 80;
+  fveNodeLeft = 420;
+  fveNodeTop = 40;
+  gridNodeLeft = 120;
+  gridNodeTop = 420;
+  homeNodeLeft = 720;
+  homeNodeTop = 420;
+  fveToGridPath = 'M500 130 L250 470';
+  fveToHomePath = 'M500 130 L750 470';
+  gridToHomePath = 'M250 470 L750 470';
+
   private gridRawPower = 0;
   private fveDecimals = 2;
   private gridDecimals = 2;
   private homeDecimals = 2;
   private unit = 'kW';
+  private resizeObserver?: ResizeObserver;
 
   constructor(private cd: ChangeDetectorRef) {}
+
+  ngAfterViewInit(): void {
+    this.updateGeometry();
+    this.resizeObserver = new ResizeObserver(() => {
+      this.updateGeometry();
+      this.cd.detectChanges();
+    });
+    this.resizeObserver.observe(this.diagramRef.nativeElement);
+  }
+
+  ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
+  }
 
   ngOnInit(): void {
     if (this.ctx?.$scope) {
@@ -48,7 +87,13 @@ export class MiikueIrisXComponent implements OnInit, OnChanges {
   }
 
   public onInit(): void {
+    this.updateGeometry();
     this.onDataUpdated();
+  }
+
+  public onResize(): void {
+    this.updateGeometry();
+    this.cd.detectChanges();
   }
 
   public onDataUpdated(): void {
@@ -129,6 +174,73 @@ export class MiikueIrisXComponent implements OnInit, OnChanges {
     ];
   }
 
+  private updateGeometry(): void {
+    const el = this.diagramRef?.nativeElement;
+    if (!el) {
+      return;
+    }
+
+    const width = Math.max(el.clientWidth, 180);
+    const height = Math.max(el.clientHeight, 120);
+    const minSide = Math.min(width, height);
+
+    this.diagramWidth = width;
+    this.diagramHeight = height;
+
+    const padding = minSide * 0.08;
+    const diameter = 80;
+    const radius = diameter / 2;
+
+    this.nodeDiameterPx = diameter;
+
+    const fveCenter = {
+      x: width / 2,
+      y: padding + radius
+    };
+
+    const gridCenter = {
+      x: padding + radius,
+      y: height - padding - radius
+    };
+
+    const homeCenter = {
+      x: width - padding - radius,
+      y: height - padding - radius
+    };
+
+    this.fveNodeLeft = fveCenter.x - radius;
+    this.fveNodeTop = fveCenter.y - radius;
+    this.gridNodeLeft = gridCenter.x - radius;
+    this.gridNodeTop = gridCenter.y - radius;
+    this.homeNodeLeft = homeCenter.x - radius;
+    this.homeNodeTop = homeCenter.y - radius;
+
+    const pathOffset = radius + 2;
+    this.fveToGridPath = this.buildLinePath(fveCenter, gridCenter, pathOffset);
+    this.fveToHomePath = this.buildLinePath(fveCenter, homeCenter, pathOffset);
+    this.gridToHomePath = this.buildLinePath(gridCenter, homeCenter, pathOffset);
+  }
+
+  private buildLinePath(from: { x: number; y: number }, to: { x: number; y: number }, cut: number): string {
+    const start = this.offsetToward(from, to, cut);
+    const end = this.offsetToward(to, from, cut);
+    return `M${start.x} ${start.y} L${end.x} ${end.y}`;
+  }
+
+  private offsetToward(from: { x: number; y: number }, to: { x: number; y: number }, distance: number): { x: number; y: number } {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    return {
+      x: from.x + (dx / length) * distance,
+      y: from.y + (dy / length) * distance
+    };
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+  }
+
   private buildEdgeBubbles(edge: FlowEdge, power: number, scale: number): FlowBubble[] {
     if (power <= 0 || scale <= 0) {
       return [];
@@ -137,7 +249,7 @@ export class MiikueIrisXComponent implements OnInit, OnChanges {
     const ratio = Math.min(power / scale, 1);
     const count = Math.max(1, Math.min(6, Math.round(ratio * 6)));
     const durationSec = 4.2 - (ratio * 2.2);
-    const sizePx = 7 + (ratio * 5);
+    const sizePx = 9;
 
     const bubbles: FlowBubble[] = [];
     for (let i = 0; i < count; i++) {
