@@ -164,6 +164,7 @@ function handleRender(message: RenderMessage): { series: WorkerSeriesResult[]; x
   }
 
   const alignedBarSeriesData = alignBarSeriesData(barSeriesData);
+  const adjustedBarSeriesData = adjustFveSeriesByExport(alignedBarSeriesData);
 
   for (const [name, state] of seriesState.entries()) {
     if (getSeriesRole(name) === 'spotreba') {
@@ -176,7 +177,7 @@ function handleRender(message: RenderMessage): { series: WorkerSeriesResult[]; x
       series.push({
         name,
         color,
-        data: toBarSeriesData(alignedBarSeriesData.get(name) || [], isExport ? -1 : 1, isExport)
+      data: toBarSeriesData(adjustedBarSeriesData.get(name) || [], isExport ? -1 : 1, isExport)
       });
   }
 
@@ -237,6 +238,11 @@ function getSeriesRole(seriesName: string): SeriesRole {
   return 'positiveBar';
 }
 
+function isImportSeries(seriesName: string): boolean {
+  const normalizedName = normalizeSeriesName(seriesName);
+  return normalizedName.includes('import') || normalizedName.includes('odber');
+}
+
 function toBarSeriesData(points: SeriesPoint[], valueMultiplier = 1, keepZeroNegative = false): SeriesPoint[] {
   return points
     .filter((point): point is [number, number] => point[1] != null)
@@ -273,6 +279,43 @@ function alignBarSeriesData(seriesMap: Map<string, SeriesPoint[]>): Map<string, 
   }
 
   return aligned;
+}
+
+function adjustFveSeriesByExport(seriesMap: Map<string, SeriesPoint[]>): Map<string, SeriesPoint[]> {
+  const exportByTimestamp = new Map<number, number>();
+
+  for (const [name, points] of seriesMap.entries()) {
+    if (getSeriesRole(name) !== 'export') {
+      continue;
+    }
+
+    for (const point of points) {
+      const value = point[1] ?? 0;
+      exportByTimestamp.set(point[0], (exportByTimestamp.get(point[0]) ?? 0) + value);
+    }
+  }
+
+  if (!exportByTimestamp.size) {
+    return seriesMap;
+  }
+
+  const adjusted = new Map<string, SeriesPoint[]>();
+  for (const [name, points] of seriesMap.entries()) {
+    if (getSeriesRole(name) === 'positiveBar' && !isImportSeries(name)) {
+      adjusted.set(
+        name,
+        points.map((point) => {
+          const value = point[1] ?? 0;
+          const exportValue = exportByTimestamp.get(point[0]) ?? 0;
+          return [point[0], Math.max(0, value - exportValue)];
+        })
+      );
+    } else {
+      adjusted.set(name, points);
+    }
+  }
+
+  return adjusted;
 }
 
 function decimateForWidth(points: SeriesPoint[], width: number, maxPointsPerPixel: number): SeriesPoint[] {

@@ -220,6 +220,7 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
     }
 
     const alignedBarSeriesData = this.alignBarSeriesData(barSeriesData);
+    const adjustedBarSeriesData = this.adjustFveSeriesByExport(alignedBarSeriesData);
 
     for (const [name, points] of this.rawSeriesMap.entries()) {
       const seriesColor = this.seriesColorMap.get(name) || colors[colorIndex % colors.length];
@@ -227,7 +228,7 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
       if (this.getSeriesRole(name) === 'spotreba') {
         echartsSeriesData.push(this.buildSeriesOption(name, this.decimateForCurrentWidth(points), seriesColor, 2));
       } else {
-        echartsSeriesData.push(this.buildSeriesOption(name, alignedBarSeriesData.get(name) || [], seriesColor, 2));
+        echartsSeriesData.push(this.buildSeriesOption(name, adjustedBarSeriesData.get(name) || [], seriesColor, 2));
       }
 
       colorIndex++;
@@ -454,6 +455,11 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
     return 'positiveBar';
   }
 
+  private isImportSeries(seriesName: string): boolean {
+    const normalizedName = this.normalizeSeriesName(seriesName);
+    return normalizedName.includes('import') || normalizedName.includes('odber');
+  }
+
   private toBarSeriesData(points: SeriesPoint[], valueMultiplier = 1, keepZeroNegative = false): SeriesPoint[] {
     // Stacked bars should contain only numeric points.
     return points
@@ -494,6 +500,43 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
     }
 
     return aligned;
+  }
+
+  private adjustFveSeriesByExport(seriesMap: Map<string, SeriesPoint[]>): Map<string, SeriesPoint[]> {
+    const exportByTimestamp = new Map<number, number>();
+
+    for (const [name, points] of seriesMap.entries()) {
+      if (this.getSeriesRole(name) !== 'export') {
+        continue;
+      }
+
+      for (const point of points) {
+        const value = point[1] ?? 0;
+        exportByTimestamp.set(point[0], (exportByTimestamp.get(point[0]) ?? 0) + value);
+      }
+    }
+
+    if (!exportByTimestamp.size) {
+      return seriesMap;
+    }
+
+    const adjusted = new Map<string, SeriesPoint[]>();
+    for (const [name, points] of seriesMap.entries()) {
+      if (this.getSeriesRole(name) === 'positiveBar' && !this.isImportSeries(name)) {
+        adjusted.set(
+          name,
+          points.map((point) => {
+            const value = point[1] ?? 0;
+            const exportValue = exportByTimestamp.get(point[0]) ?? 0;
+            return [point[0], Math.max(0, value - exportValue)];
+          })
+        );
+      } else {
+        adjusted.set(name, points);
+      }
+    }
+
+    return adjusted;
   }
 
   private prepareSeriesDataForRender(seriesName: string, points: SeriesPoint[]): SeriesPoint[] {
@@ -586,6 +629,7 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
     }
 
     const alignedBarSeriesData = this.alignBarSeriesData(barSeriesData);
+    const adjustedBarSeriesData = this.adjustFveSeriesByExport(alignedBarSeriesData);
 
     for (const [name, points] of this.rawSeriesMap.entries()) {
       const seriesColor = this.seriesColorMap.get(name) || colors[colorIndex % colors.length];
@@ -595,7 +639,7 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
         const decimated = this.decimateForCurrentWidth(inRange);
         updatedSeries.push(this.buildSeriesOption(name, decimated, seriesColor, 2));
       } else {
-        updatedSeries.push(this.buildSeriesOption(name, alignedBarSeriesData.get(name) || [], seriesColor, 2));
+        updatedSeries.push(this.buildSeriesOption(name, adjustedBarSeriesData.get(name) || [], seriesColor, 2));
       }
 
       colorIndex++;
