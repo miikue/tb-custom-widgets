@@ -6,18 +6,26 @@ import { MiikueSpotrebaGrafComponent } from './miikue-spotreba-graf/miikue-spotr
 import {
   MiikueSpotrebaGrafEngineComponent
 } from './miikue-spotreba-graf/engine/miikue-spotreba-graf-engine.component';
+import { MiikueSpotrebaGrafKwhComponent } from './miikue-spotreba-graf-kwh/miikue-spotreba-graf-kwh.component';
+import {
+  MiikueSpotrebaGrafKwhEngineComponent
+} from './miikue-spotreba-graf-kwh/engine/miikue-spotreba-graf-kwh-engine.component';
 
 @NgModule({
   declarations: [
     MiikueIrisXComponent,
     MiikueSpotrebaGrafComponent,
-    MiikueSpotrebaGrafEngineComponent
+    MiikueSpotrebaGrafEngineComponent,
+    MiikueSpotrebaGrafKwhComponent,
+    MiikueSpotrebaGrafKwhEngineComponent
   ],
   imports: [CommonModule, CommonComponentsModule],
   exports: [
     MiikueIrisXComponent,
     MiikueSpotrebaGrafComponent,
-    MiikueSpotrebaGrafEngineComponent
+    MiikueSpotrebaGrafEngineComponent,
+    MiikueSpotrebaGrafKwhComponent,
+    MiikueSpotrebaGrafKwhEngineComponent
   ]
 })
 export class EnergieComponentsModule {}
