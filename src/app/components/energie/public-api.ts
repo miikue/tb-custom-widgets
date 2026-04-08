@@ -3,3 +3,5 @@
 
 export * from './energie.module';
 export * from './miikue-iris-x/miikue-iris-x.component';
+export * from './miikue-spotreba-graf/miikue-spotreba-graf.component';
+export * from './miikue-spotreba-graf/engine/miikue-spotreba-graf-engine.component';
