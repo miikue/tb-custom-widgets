@@ -8,18 +8,18 @@
   box-sizing: border-box;
   display: flex;
   height: 100%;
-  padding: 12px;
+  padding: 8px;
   width: 100%;
 }
 
 .notifikation-wrapper.collapsed {
-  align-items: center;
+  align-items: flex-start;
   background: #f8fafc;
   color: #0f172a;
   flex-direction: column;
   gap: 4px;
   justify-content: center;
-  text-align: center;
+  text-align: left;
 }
 
 .notifikation-wrapper.expanded {
@@ -33,10 +33,10 @@
 }
 
 .collapsed-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .collapsed-count {

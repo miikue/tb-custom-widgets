@@ -15,11 +15,10 @@ import { DataKey, Datasource } from '@shared/public-api';
 })
 export class MiikueChartBasicConfigComponent extends BasicWidgetConfigComponent {
 
-  public configFormGroup: FormGroup;
-  public basicMode = this.basicMode;
+  public configFormGroup!: FormGroup;
 
   public get datasource(): Datasource | null {
-    const datasources: Datasource[] = this.configFormGroup.get('datasources').value;
+    const datasources: Datasource[] = this.configFormGroup?.get('datasources')?.value;
     if (datasources && datasources.length) {
       return datasources[0];
     }
@@ -38,9 +37,11 @@ export class MiikueChartBasicConfigComponent extends BasicWidgetConfigComponent 
 
   protected onConfigSet(configData: WidgetConfigComponentData): void {
     const showSmallGraph = this.getShowSmallGraph(configData.config.settings);
+    const title = this.getTitle(configData.config.settings);
     this.configFormGroup = this.fb.group({
       datasources: [configData.config.datasources, []],
       dataKeys: [this.getDataKeys(configData.config.datasources), []],
+      title: [title, []],
       showSmallGraph: [showSmallGraph, []],
       actions: [configData.config.actions || {}, []]
     });
@@ -51,6 +52,7 @@ export class MiikueChartBasicConfigComponent extends BasicWidgetConfigComponent 
     this.widgetConfig.config.actions = config.actions;
     this.widgetConfig.config.settings = {
       ...(this.widgetConfig.config.settings || {}),
+      title: this.normalizeText(config.title, ''),
       showSmallGraph: this.normalizeBoolean(config.showSmallGraph, true)
     };
     this.setDataKeys(config.dataKeys, this.widgetConfig.config.datasources);
@@ -59,6 +61,14 @@ export class MiikueChartBasicConfigComponent extends BasicWidgetConfigComponent 
 
   private getShowSmallGraph(settings?: any): boolean {
     return this.normalizeBoolean(settings?.showSmallGraph, true);
+  }
+
+  private getTitle(settings?: any): string {
+    return this.normalizeText(settings?.title, '');
+  }
+
+  private normalizeText(value: any, fallback: string): string {
+    return typeof value === 'string' && value.trim().length ? value.trim() : fallback;
   }
 
   private normalizeBoolean(value: any, fallback: boolean): boolean {

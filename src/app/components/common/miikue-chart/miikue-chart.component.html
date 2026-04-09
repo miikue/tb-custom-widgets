@@ -1,4 +1,8 @@
 <div *ngIf="shouldRenderChart; else collapsedBlock" class="miikue-chart">
+  <div class="miikue-chart__title-row" *ngIf="chartTitle">
+    <div class="miikue-chart__title">{{ chartTitle }}</div>
+  </div>
+
   <div class="miikue-chart__toolbar">
     <div class="miikue-chart__toolbar-left">
       <app-miikue-time-window-selector
@@ -58,6 +62,6 @@
 
 <ng-template #collapsedBlock>
   <div class="miikue-chart-collapsed">
-    Graf je dostupny pouze ve fullscreen modu.
+    <div class="miikue-chart-collapsed__title" *ngIf="chartTitle">{{ chartTitle }}</div>
   </div>
 </ng-template>

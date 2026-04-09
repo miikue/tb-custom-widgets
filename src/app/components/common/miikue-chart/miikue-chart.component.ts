@@ -66,6 +66,10 @@ export class MiikueChartComponent implements OnInit {
     return this.resolveShowSmallGraph() || this.isWidgetExpanded;
   }
 
+  get chartTitle(): string {
+    return this.resolveChartTitle();
+  }
+
   async ngOnInit() {
     console.log('[MiikueChart] ngOnInit - loading data from API');
     if (this.ctx?.$scope) {
@@ -573,6 +577,11 @@ export class MiikueChartComponent implements OnInit {
     }
 
     return true;
+  }
+
+  private resolveChartTitle(): string {
+    const title = (this.ctx as any)?.settings?.title;
+    return typeof title === 'string' ? title.trim() : '';
   }
 
   private enterCollapsedIdleState(): void {
