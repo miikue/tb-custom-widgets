@@ -5,17 +5,6 @@
         [initialTimeWindow]="selectedTimeWindow"
         (timeWindowChange)="onTimeWindowChange($event)">
       </app-miikue-time-window-selector>
-
-      <div class="miikue-spotreba-graf-kwh__aggregation-selector">
-        <button
-          *ngFor="let mode of aggregationModes"
-          type="button"
-          class="miikue-spotreba-graf-kwh__aggregation-btn"
-          [class.active]="selectedAggregationMode === mode.value"
-          (click)="onAggregationModeChange(mode.value)">
-          {{ mode.label }}
-        </button>
-      </div>
     </div>
 
     <div class="miikue-spotreba-graf-kwh__toolbar-center">

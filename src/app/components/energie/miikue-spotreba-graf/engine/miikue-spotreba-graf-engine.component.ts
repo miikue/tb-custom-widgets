@@ -268,7 +268,7 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
       legend: this.buildLegendOption(legendData),
       grid: {
         left: 24,
-        right: 16,
+        right: 6,
         top: 30,
         bottom: 40,
         containLabel: true
@@ -558,6 +558,7 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
     if (role !== 'spotreba') {
       const isExport = role === 'export';
       const barSign = isExport ? -1 : 1;
+      const areaGradient = this.buildAreaFillGradient(seriesColor, isExport);
       return {
         name,
         type: 'line',
@@ -571,8 +572,7 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
           color: seriesColor
         },
         areaStyle: {
-          opacity: 0.32,
-          color: seriesColor
+          color: areaGradient
         },
         itemStyle: {
           color: seriesColor,
@@ -594,12 +594,85 @@ export class MiikueSpotrebaGrafEngineComponent implements AfterViewInit, OnChang
       smooth: false,
       lineStyle: {
         width: 2.5,
-        color: seriesColor
+        color: seriesColor,
+        type: 'dashed'
       },
       itemStyle: {
         color: seriesColor,
         borderWidth: 0
       }
+    };
+  }
+
+  private buildAreaFillGradient(seriesColor: string, isExport: boolean): any {
+    const zeroShadeColor = this.buildShadeColor(seriesColor, 'dark', 0.32);
+    const farShadeColor = this.buildShadeColor(seriesColor, 'light', 0.22);
+
+    // Keep darker shade near the rendered line for both positive and negative fills.
+    const topColor = isExport ? farShadeColor : zeroShadeColor;
+    const bottomColor = isExport ? zeroShadeColor : farShadeColor;
+
+    return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+      { offset: 0, color: topColor },
+      { offset: 1, color: bottomColor }
+    ]);
+  }
+
+  private buildShadeColor(baseColor: string, mode: 'dark' | 'light', alpha: number): string {
+    const rgb = this.parseColorToRgb(baseColor);
+    if (!rgb) {
+      return baseColor;
+    }
+
+    const mixRatio = mode === 'dark' ? 0.11 : 0.21;
+    const mixTarget = mode === 'dark' ? 0 : 255;
+
+    const r = this.mixChannel(rgb.r, mixTarget, mixRatio);
+    const g = this.mixChannel(rgb.g, mixTarget, mixRatio);
+    const b = this.mixChannel(rgb.b, mixTarget, mixRatio);
+
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  private mixChannel(value: number, target: number, ratio: number): number {
+    return Math.round(value + (target - value) * ratio);
+  }
+
+  private parseColorToRgb(color: string): { r: number; g: number; b: number } | null {
+    const input = String(color || '').trim();
+    if (!input) {
+      return null;
+    }
+
+    const hex = input.startsWith('#') ? input.slice(1) : '';
+    if (hex.length === 3 || hex.length === 6) {
+      const normalized = hex.length === 3
+        ? hex.split('').map((ch) => ch + ch).join('')
+        : hex;
+      const parsed = Number.parseInt(normalized, 16);
+      if (!Number.isNaN(parsed)) {
+        return {
+          r: (parsed >> 16) & 255,
+          g: (parsed >> 8) & 255,
+          b: parsed & 255
+        };
+      }
+    }
+
+    const rgbMatch = input.match(/^rgba?\(([^)]+)\)$/i);
+    if (!rgbMatch) {
+      return null;
+    }
+
+    const parts = rgbMatch[1].split(',').map((part) => Number(part.trim()));
+    if (parts.length < 3 || parts.slice(0, 3).some((part) => !Number.isFinite(part))) {
+      return null;
+    }
+
+    return {
+      r: Math.max(0, Math.min(255, Math.round(parts[0]))),
+      g: Math.max(0, Math.min(255, Math.round(parts[1]))),
+      b: Math.max(0, Math.min(255, Math.round(parts[2])))
     };
   }
 

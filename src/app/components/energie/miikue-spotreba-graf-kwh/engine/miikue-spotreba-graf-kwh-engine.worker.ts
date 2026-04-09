@@ -7,7 +7,7 @@ interface ChartDataPoint {
   color?: string;
 }
 
-type AggregationMode = 'seconds' | 'min' | 'hour';
+type AggregationMode = 'seconds' | 'min' | 'hour' | 'day';
 type SeriesPoint = [number, number | null];
 type SeriesRole = 'spotreba' | 'export' | 'positiveBar';
 
@@ -20,6 +20,7 @@ interface ChartEngineSettings {
   rawGapBreakSeconds?: number;
   minGapBreakMinutes?: number;
   hourGapBreakHours?: number;
+  dayGapBreakDays?: number;
 }
 
 interface SetDataMessage {
@@ -370,6 +371,10 @@ function buildSeriesWithGapBreaks(dataPoints: Array<{ ts: number; value: number 
 
 function resolveGapThresholdMs(): number {
   switch (aggregationMode) {
+    case 'day':
+      return Number.isFinite(settings.dayGapBreakDays) && (settings.dayGapBreakDays as number) > 0
+        ? (settings.dayGapBreakDays as number) * 24 * 60 * 60 * 1000
+        : 24 * 60 * 60 * 1000;
     case 'min':
       return Number.isFinite(settings.minGapBreakMinutes) && (settings.minGapBreakMinutes as number) > 0
         ? (settings.minGapBreakMinutes as number) * 60 * 1000

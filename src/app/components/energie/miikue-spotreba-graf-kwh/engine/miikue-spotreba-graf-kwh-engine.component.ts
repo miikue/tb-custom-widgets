@@ -16,7 +16,7 @@ export interface SpotrebaGrafKwhChartDataPoint {
 
 interface MiikueSpotrebaGrafKwhEngineCtx extends Partial<WidgetContext> {
   chartData?: SpotrebaGrafKwhChartDataPoint[];
-  aggregationMode?: 'seconds' | 'min' | 'hour';
+  aggregationMode?: 'seconds' | 'min' | 'hour' | 'day';
   selectedTimeWindow?: {
     startTs: number;
     endTs: number;
@@ -24,7 +24,7 @@ interface MiikueSpotrebaGrafKwhEngineCtx extends Partial<WidgetContext> {
   color?: string;
 }
 
-type AggregationMode = 'seconds' | 'min' | 'hour';
+type AggregationMode = 'seconds' | 'min' | 'hour' | 'day';
 type SeriesRole = 'spotreba' | 'export' | 'positiveBar';
 type SeriesPoint = [number, number | null];
 
@@ -221,14 +221,15 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
 
     const alignedBarSeriesData = this.alignBarSeriesData(barSeriesData);
     const adjustedBarSeriesData = this.adjustFveSeriesByExport(alignedBarSeriesData);
+    const barSlotCount = this.resolveBarSlotCountFromWindow();
 
     for (const [name, points] of this.rawSeriesMap.entries()) {
       const seriesColor = this.seriesColorMap.get(name) || colors[colorIndex % colors.length];
 
       if (this.getSeriesRole(name) === 'spotreba') {
-        echartsSeriesData.push(this.buildSeriesOption(name, this.decimateForCurrentWidth(points), seriesColor, 2));
+        echartsSeriesData.push(this.buildSeriesOption(name, this.decimateForCurrentWidth(points), seriesColor, 2, barSlotCount));
       } else {
-        echartsSeriesData.push(this.buildSeriesOption(name, adjustedBarSeriesData.get(name) || [], seriesColor, 2));
+        echartsSeriesData.push(this.buildSeriesOption(name, adjustedBarSeriesData.get(name) || [], seriesColor, 2, barSlotCount));
       }
 
       colorIndex++;
@@ -268,7 +269,7 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       legend: this.buildLegendOption(legendData),
       grid: {
         left: 24,
-        right: 16,
+        right: 6,
         top: 30,
         bottom: 40,
         containLabel: true
@@ -551,28 +552,26 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
     name: string,
     data: SeriesPoint[],
     seriesColor: string,
-    lineSymbolSize: number
+    lineSymbolSize: number,
+    barSlotCount = 0
   ): any {
     const role = this.getSeriesRole(name);
 
     if (role !== 'spotreba') {
       const isExport = role === 'export';
       const barSign = isExport ? -1 : 1;
+      const barStyle = this.resolveBarStyle(barSlotCount);
       return {
         name,
-        type: 'line',
+        type: 'bar',
         data: this.toBarSeriesData(data, barSign, isExport),
-        stack: 'net-energy-area',
-        showSymbol: false,
-        symbol: 'none',
-        smooth: false,
-        lineStyle: {
-          width: 1,
-          color: seriesColor
-        },
-        areaStyle: {
-          opacity: 0.32,
-          color: seriesColor
+        stack: 'net-energy-bars',
+        barWidth: barStyle.widthPx,
+        barMinWidth: barStyle.minWidthPx,
+        barGap: '0%',
+        barCategoryGap: barStyle.categoryGap,
+        emphasis: {
+          focus: 'series'
         },
         itemStyle: {
           color: seriesColor,
@@ -630,6 +629,7 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
 
     const alignedBarSeriesData = this.alignBarSeriesData(barSeriesData);
     const adjustedBarSeriesData = this.adjustFveSeriesByExport(alignedBarSeriesData);
+    const barSlotCount = this.resolveBarSlotCountFromWindow();
 
     for (const [name, points] of this.rawSeriesMap.entries()) {
       const seriesColor = this.seriesColorMap.get(name) || colors[colorIndex % colors.length];
@@ -637,9 +637,9 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       if (this.getSeriesRole(name) === 'spotreba') {
         const inRange = this.filterByRange(points, visible.minTs, visible.maxTs);
         const decimated = this.decimateForCurrentWidth(inRange);
-        updatedSeries.push(this.buildSeriesOption(name, decimated, seriesColor, 2));
+        updatedSeries.push(this.buildSeriesOption(name, decimated, seriesColor, 2, barSlotCount));
       } else {
-        updatedSeries.push(this.buildSeriesOption(name, adjustedBarSeriesData.get(name) || [], seriesColor, 2));
+        updatedSeries.push(this.buildSeriesOption(name, adjustedBarSeriesData.get(name) || [], seriesColor, 2, barSlotCount));
       }
 
       colorIndex++;
@@ -680,11 +680,12 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       requestId,
       chartData: this.ctx?.chartData || [],
       selectedTimeWindow: this.ctx?.selectedTimeWindow,
-      aggregationMode: this.ctx?.aggregationMode || 'seconds',
+      aggregationMode: this.ctx?.aggregationMode || 'hour',
       settings: {
         rawGapBreakSeconds: Number((this.ctx as any)?.settings?.rawGapBreakSeconds),
         minGapBreakMinutes: Number((this.ctx as any)?.settings?.minGapBreakMinutes),
-        hourGapBreakHours: Number((this.ctx as any)?.settings?.hourGapBreakHours)
+        hourGapBreakHours: Number((this.ctx as any)?.settings?.hourGapBreakHours),
+        dayGapBreakDays: Number((this.ctx as any)?.settings?.dayGapBreakDays)
       }
     });
   }
@@ -735,10 +736,11 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       return;
     }
 
+    const barSlotCount = this.resolveBarSlotCountFromWindow();
     const colors = ['#2196f3', '#FFC107', '#FF5733', '#33FF57', '#FF9800'];
     const echartsSeriesData = result.series.map((series, index) => {
       const seriesColor = series.color || colors[index % colors.length];
-      return this.buildSeriesOption(series.name, series.data, seriesColor, 6);
+      return this.buildSeriesOption(series.name, series.data, seriesColor, 6, barSlotCount);
     });
 
     const chartBackground = this.resolveChartBackground();
@@ -813,7 +815,7 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
     const firstValue = Array.isArray(items[0]?.value) ? items[0].value[0] : items[0]?.axisValue;
     const ts = Number(firstValue);
     const header = Number.isFinite(ts)
-      ? new Date(ts).toLocaleString('cs-CZ')
+      ? this.formatTimeBucketLabel(ts)
       : String(firstValue ?? '');
 
     const validItems = items.filter((item: any) => {
@@ -849,13 +851,139 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       return String(value ?? '');
     }
 
-    return date.toLocaleString('cs-CZ', {
+    return this.formatTimeBucketLabel(date.getTime());
+  }
+
+  private formatTimeBucketLabel(timestamp: number): string {
+    const mode = this.getAggregationMode();
+    const numericTimestamp = Number(timestamp);
+    const range = this.resolveBucketRangeFromStart(numericTimestamp, mode);
+    if (!range) {
+      return String(timestamp ?? '');
+    }
+
+    if (mode === 'hour') {
+      const start = new Date(range.startTs);
+      const end = new Date(range.endTs);
+      const from = this.formatHourMinute(start);
+      const to = this.formatHourMinute(end);
+      return `${from}-${to}`;
+    }
+
+    if (mode === 'day') {
+      const start = new Date(range.startTs);
+      return this.formatDayMonth(start);
+    }
+
+    const start = new Date(range.startTs);
+
+    return start.toLocaleString('cs-CZ', {
       day: '2-digit',
       month: '2-digit',
       hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
+      minute: '2-digit'
     });
+  }
+
+  private resolveBucketRangeFromStart(
+    timestamp: number,
+    mode: AggregationMode
+  ): { startTs: number; endTs: number } | null {
+    if (!Number.isFinite(timestamp)) {
+      return null;
+    }
+
+    if (mode === 'day') {
+      const start = new Date(timestamp);
+      if (isNaN(start.getTime())) {
+        return null;
+      }
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      return { startTs: start.getTime(), endTs: end.getTime() };
+    }
+
+    const bucketMs = this.getBucketSizeMs(mode);
+    if (!Number.isFinite(bucketMs) || bucketMs <= 0) {
+      return null;
+    }
+
+    const startTs = Math.floor(timestamp / bucketMs) * bucketMs;
+    return {
+      startTs,
+      endTs: startTs + bucketMs
+    };
+  }
+
+  private getBucketSizeMs(mode: AggregationMode): number {
+    switch (mode) {
+      case 'day':
+        return 24 * 60 * 60 * 1000;
+      case 'hour':
+        return 60 * 60 * 1000;
+      case 'min':
+        return 60 * 1000;
+      case 'seconds':
+      default:
+        return 1000;
+    }
+  }
+
+  private formatHourMinute(date: Date): string {
+    const hour = String(date.getHours()).padStart(2, '0');
+    const minute = String(date.getMinutes()).padStart(2, '0');
+    return `${hour}:${minute}`;
+  }
+
+  private formatDayMonth(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${day}.${month}`;
+  }
+
+  private resolveBarStyle(slotCount: number): { widthPx?: number; minWidthPx: number; categoryGap: string } {
+    if (!this.chart || slotCount <= 0) {
+      return {
+        widthPx: undefined,
+        minWidthPx: 4,
+        categoryGap: '0%'
+      };
+    }
+
+    const chartWidth = Math.max(1, this.chart.getWidth?.() || this.chartContainer?.nativeElement?.clientWidth || 1);
+    const plotWidth = Math.max(1, chartWidth - 40);
+    const slotWidthPx = plotWidth / Math.max(1, slotCount);
+    const widthPx = Math.floor(Math.max(1, slotWidthPx * 0.5));
+    return {
+      widthPx: Math.max(3, widthPx),
+      minWidthPx: 3,
+      categoryGap: '0%'
+    };
+  }
+
+  private resolveBarSlotCountFromWindow(): number {
+    const startTs = Number(this.ctx?.selectedTimeWindow?.startTs);
+    const endTs = Number(this.ctx?.selectedTimeWindow?.endTs);
+    if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) {
+      return 0;
+    }
+
+    const rangeMs = Math.max(1, Math.abs(endTs - startTs));
+    const bucketMs = this.getBucketSizeMs(this.getAggregationMode());
+    if (!Number.isFinite(bucketMs) || bucketMs <= 0) {
+      return 0;
+    }
+
+    return Math.max(1, Math.ceil(rangeMs / bucketMs));
+  }
+
+  private getAggregationMode(): AggregationMode {
+    const mode = this.ctx?.aggregationMode;
+    if (mode === 'seconds' || mode === 'min' || mode === 'hour' || mode === 'day') {
+      return mode;
+    }
+    return 'hour';
   }
 
   private formatYAxisLabel(value: number): string {
@@ -1010,11 +1138,16 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
   }
 
   private resolveGapThresholdMs(): number {
-    const mode: AggregationMode = this.ctx?.aggregationMode || 'seconds';
+    const mode: AggregationMode = this.ctx?.aggregationMode || 'hour';
     const rawGapBreakSeconds = Number((this.ctx as any)?.settings?.rawGapBreakSeconds);
     const minGapBreakMinutes = Number((this.ctx as any)?.settings?.minGapBreakMinutes);
     const hourGapBreakHours = Number((this.ctx as any)?.settings?.hourGapBreakHours);
+    const dayGapBreakDays = Number((this.ctx as any)?.settings?.dayGapBreakDays);
     switch (mode) {
+      case 'day':
+        return Number.isFinite(dayGapBreakDays) && dayGapBreakDays > 0
+          ? dayGapBreakDays * 24 * 60 * 60 * 1000
+          : 24 * 60 * 60 * 1000;
       case 'min':
         return Number.isFinite(minGapBreakMinutes) && minGapBreakMinutes > 0
           ? minGapBreakMinutes * 60 * 1000
