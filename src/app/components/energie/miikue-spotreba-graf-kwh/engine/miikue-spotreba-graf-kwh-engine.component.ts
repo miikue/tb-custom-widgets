@@ -16,7 +16,7 @@ export interface SpotrebaGrafKwhChartDataPoint {
 
 interface MiikueSpotrebaGrafKwhEngineCtx extends Partial<WidgetContext> {
   chartData?: SpotrebaGrafKwhChartDataPoint[];
-  aggregationMode?: 'seconds' | 'min' | 'hour' | 'day';
+  aggregationMode?: 'seconds' | 'min' | 'hour' | 'day' | 'month';
   selectedTimeWindow?: {
     startTs: number;
     endTs: number;
@@ -24,7 +24,7 @@ interface MiikueSpotrebaGrafKwhEngineCtx extends Partial<WidgetContext> {
   color?: string;
 }
 
-type AggregationMode = 'seconds' | 'min' | 'hour' | 'day';
+type AggregationMode = 'seconds' | 'min' | 'hour' | 'day' | 'month';
 type SeriesRole = 'spotreba' | 'export' | 'positiveBar';
 type SeriesPoint = [number, number | null];
 
@@ -561,6 +561,7 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       const isExport = role === 'export';
       const barSign = isExport ? -1 : 1;
       const barStyle = this.resolveBarStyle(barSlotCount);
+      const fillColor = this.withAlpha(seriesColor, 0.45);
       return {
         name,
         type: 'bar',
@@ -574,8 +575,9 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
           focus: 'series'
         },
         itemStyle: {
-          color: seriesColor,
-          borderWidth: 0
+          color: fillColor,
+          borderColor: seriesColor,
+          borderWidth: 1
         }
       };
     }
@@ -685,7 +687,8 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
         rawGapBreakSeconds: Number((this.ctx as any)?.settings?.rawGapBreakSeconds),
         minGapBreakMinutes: Number((this.ctx as any)?.settings?.minGapBreakMinutes),
         hourGapBreakHours: Number((this.ctx as any)?.settings?.hourGapBreakHours),
-        dayGapBreakDays: Number((this.ctx as any)?.settings?.dayGapBreakDays)
+        dayGapBreakDays: Number((this.ctx as any)?.settings?.dayGapBreakDays),
+        monthGapBreakMonths: Number((this.ctx as any)?.settings?.monthGapBreakMonths)
       }
     });
   }
@@ -875,6 +878,10 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       return this.formatDayMonth(start);
     }
 
+    if (mode === 'month') {
+      return this.formatMonthYear(new Date(range.startTs));
+    }
+
     const start = new Date(range.startTs);
 
     return start.toLocaleString('cs-CZ', {
@@ -904,6 +911,18 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       return { startTs: start.getTime(), endTs: end.getTime() };
     }
 
+    if (mode === 'month') {
+      const start = new Date(timestamp);
+      if (isNaN(start.getTime())) {
+        return null;
+      }
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + 1);
+      return { startTs: start.getTime(), endTs: end.getTime() };
+    }
+
     const bucketMs = this.getBucketSizeMs(mode);
     if (!Number.isFinite(bucketMs) || bucketMs <= 0) {
       return null;
@@ -918,6 +937,8 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
 
   private getBucketSizeMs(mode: AggregationMode): number {
     switch (mode) {
+      case 'month':
+        return 30 * 24 * 60 * 60 * 1000;
       case 'day':
         return 24 * 60 * 60 * 1000;
       case 'hour':
@@ -940,6 +961,45 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     return `${day}.${month}`;
+  }
+
+  private formatMonthYear(date: Date): string {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear());
+    return `${month}.${year}`;
+  }
+
+  private withAlpha(color: string, alpha: number): string {
+    const normalizedAlpha = Math.max(0, Math.min(1, alpha));
+    const input = String(color || '').trim();
+    if (!input) {
+      return `rgba(0, 0, 0, ${normalizedAlpha})`;
+    }
+
+    const hex = input.startsWith('#') ? input.slice(1) : '';
+    if (hex.length === 3 || hex.length === 6) {
+      const normalizedHex = hex.length === 3 ? hex.split('').map((ch) => ch + ch).join('') : hex;
+      const parsed = Number.parseInt(normalizedHex, 16);
+      if (!Number.isNaN(parsed)) {
+        const r = (parsed >> 16) & 255;
+        const g = (parsed >> 8) & 255;
+        const b = parsed & 255;
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+    }
+
+    const rgbMatch = input.match(/^rgba?\(([^)]+)\)$/i);
+    if (rgbMatch) {
+      const parts = rgbMatch[1].split(',').map((part) => Number(part.trim()));
+      if (parts.length >= 3 && parts.slice(0, 3).every((part) => Number.isFinite(part))) {
+        const r = Math.max(0, Math.min(255, Math.round(parts[0])));
+        const g = Math.max(0, Math.min(255, Math.round(parts[1])));
+        const b = Math.max(0, Math.min(255, Math.round(parts[2])));
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+    }
+
+    return color;
   }
 
   private resolveBarStyle(slotCount: number): { widthPx?: number; minWidthPx: number; categoryGap: string } {
@@ -969,8 +1029,19 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       return 0;
     }
 
+    const mode = this.getAggregationMode();
+    if (mode === 'month') {
+      const start = new Date(Math.min(startTs, endTs));
+      const end = new Date(Math.max(startTs, endTs));
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return 0;
+      }
+      const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+      return Math.max(1, months);
+    }
+
     const rangeMs = Math.max(1, Math.abs(endTs - startTs));
-    const bucketMs = this.getBucketSizeMs(this.getAggregationMode());
+    const bucketMs = this.getBucketSizeMs(mode);
     if (!Number.isFinite(bucketMs) || bucketMs <= 0) {
       return 0;
     }
@@ -980,7 +1051,7 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
 
   private getAggregationMode(): AggregationMode {
     const mode = this.ctx?.aggregationMode;
-    if (mode === 'seconds' || mode === 'min' || mode === 'hour' || mode === 'day') {
+    if (mode === 'seconds' || mode === 'min' || mode === 'hour' || mode === 'day' || mode === 'month') {
       return mode;
     }
     return 'hour';
@@ -1143,7 +1214,12 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
     const minGapBreakMinutes = Number((this.ctx as any)?.settings?.minGapBreakMinutes);
     const hourGapBreakHours = Number((this.ctx as any)?.settings?.hourGapBreakHours);
     const dayGapBreakDays = Number((this.ctx as any)?.settings?.dayGapBreakDays);
+    const monthGapBreakMonths = Number((this.ctx as any)?.settings?.monthGapBreakMonths);
     switch (mode) {
+      case 'month':
+        return Number.isFinite(monthGapBreakMonths) && monthGapBreakMonths > 0
+          ? monthGapBreakMonths * 30 * 24 * 60 * 60 * 1000
+          : 30 * 24 * 60 * 60 * 1000;
       case 'day':
         return Number.isFinite(dayGapBreakDays) && dayGapBreakDays > 0
           ? dayGapBreakDays * 24 * 60 * 60 * 1000

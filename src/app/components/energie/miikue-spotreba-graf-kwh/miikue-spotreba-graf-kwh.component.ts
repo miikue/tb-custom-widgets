@@ -7,7 +7,7 @@ import {
 import { TimeWindow } from '../../common/miikue-time-window-selector/miikue-time-window-selector.component';
 import { firstValueFrom } from 'rxjs';
 
-type AggregationMode = 'seconds' | 'min' | 'hour' | 'day';
+type AggregationMode = 'seconds' | 'min' | 'hour' | 'day' | 'month';
 
 interface ModeCache {
   coveredStartTs: number | null;
@@ -58,7 +58,8 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
     seconds: this.createEmptyModeCache(),
     min: this.createEmptyModeCache(),
     hour: this.createEmptyModeCache(),
-    day: this.createEmptyModeCache()
+    day: this.createEmptyModeCache(),
+    month: this.createEmptyModeCache()
   };
 
   async ngOnInit() {
@@ -316,6 +317,9 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
 
   private resolveChunkSizeMs(mode: AggregationMode): number {
     switch (mode) {
+      case 'month':
+        // Monthly aggregation is chunked by year.
+        return 365 * 24 * 60 * 60 * 1000;
       case 'day':
         // Daily aggregation is chunked by month.
         return 31 * 24 * 60 * 60 * 1000;
@@ -365,14 +369,20 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
         return 'Načítám hodinová data';
       case 'day':
         return 'Načítám denní data';
+      case 'month':
+        return 'Načítám měsíční data';
       default:
         return 'Načítám data';
     }
   }
 
   private resolveEffectiveAggregationMode(windowDurationMs: number): AggregationMode {
-    // Keep hourly buckets up to 24h; beyond that collapse to day buckets.
-    return windowDurationMs > 24 * 60 * 60 * 1000 ? 'day' : 'hour';
+    const dayMs = 24 * 60 * 60 * 1000;
+    const threeMonthsMs = 92 * dayMs;
+    if (windowDurationMs > threeMonthsMs) {
+      return 'month';
+    }
+    return windowDurationMs > dayMs ? 'day' : 'hour';
   }
 
   private buildTimeChunks(startTs: number, endTs: number, chunkSizeMs: number): Array<{ startTs: number; endTs: number }> {
@@ -544,8 +554,8 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
       return [];
     }
 
-    // Day mode is assembled client-side from hourly buckets.
-    const queryMode: AggregationMode = mode === 'day' ? 'hour' : mode;
+    // Day/month modes are assembled client-side from hourly buckets.
+    const queryMode: AggregationMode = (mode === 'day' || mode === 'month') ? 'hour' : mode;
     const apiKey = this.getAggregatedKey(baseKey, queryMode);
 
     const url = `/api/plugins/telemetry/${source.entityType}/${source.entityId}/values/timeseries`
@@ -601,6 +611,10 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
         timePrev = ts;
       }
 
+      if (mode === 'month') {
+        return this.aggregatePointsByMonth(transformedPoints, seriesName, this.keyToColor.get(baseKey));
+      }
+
       if (mode === 'day') {
         return this.aggregatePointsByDay(transformedPoints, seriesName, this.keyToColor.get(baseKey));
       }
@@ -643,6 +657,37 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
     return date.getTime();
   }
 
+  private aggregatePointsByMonth(points: ChartDataPoint[], seriesName: string, color?: string): ChartDataPoint[] {
+    if (!points.length) {
+      return [];
+    }
+
+    const monthBuckets = new Map<number, number>();
+    for (const point of points) {
+      const monthStartTs = this.getLocalMonthStartTs(point.ts);
+      monthBuckets.set(monthStartTs, (monthBuckets.get(monthStartTs) || 0) + point.value);
+    }
+
+    const result: ChartDataPoint[] = [];
+    for (const [monthStartTs, sumValue] of monthBuckets.entries()) {
+      result.push({
+        ts: monthStartTs,
+        value: sumValue,
+        name: seriesName,
+        color
+      });
+    }
+
+    return result.sort((a, b) => a.ts - b.ts);
+  }
+
+  private getLocalMonthStartTs(timestamp: number): number {
+    const date = new Date(timestamp);
+    date.setDate(1);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  }
+
   private normalizeTimestampForMode(timestamp: number, mode: AggregationMode): number {
     if (!Number.isFinite(timestamp)) {
       return timestamp;
@@ -656,6 +701,8 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
       }
       case 'day':
         return this.getLocalDayStartTs(timestamp);
+      case 'month':
+        return this.getLocalMonthStartTs(timestamp);
       case 'min': {
         const bucketMs = 60 * 1000;
         return Math.floor((timestamp - bucketMs / 2) / bucketMs) * bucketMs;
@@ -685,6 +732,8 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
         return `${baseKey}_hour`;
       case 'day':
         return `${baseKey}_day`;
+      case 'month':
+        return `${baseKey}_month`;
       case 'seconds':
       default:
         return baseKey;
