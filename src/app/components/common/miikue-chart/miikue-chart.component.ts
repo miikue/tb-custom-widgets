@@ -51,6 +51,8 @@ export class MiikueChartComponent implements OnInit {
   keys: string[] = [];
   private keyToLabel = new Map<string, string>();
   private keyToColor = new Map<string, string>();
+  private keyToUnits = new Map<string, string>();
+  private keyToDecimals = new Map<string, number>();
   private keyToValueTransform = new Map<string, KeyValueTransform>();
   private fetchSequence = 0;
   private readonly maxConcurrentChunkRequests = 8;
@@ -141,6 +143,8 @@ export class MiikueChartComponent implements OnInit {
     this.labels = [];
     this.keyToLabel.clear();
     this.keyToColor.clear();
+    this.keyToUnits.clear();
+    this.keyToDecimals.clear();
     this.keyToValueTransform.clear();
 
     const dataEntries = (this.ctx as any)?.data || [];
@@ -151,11 +155,19 @@ export class MiikueChartComponent implements OnInit {
       }
       const label = entry?.dataKey?.label || key;
       const color = entry?.dataKey?.color;
+      const units = entry?.dataKey?.units;
+      const decimals = Number(entry?.dataKey?.decimals);
       this.keys.push(key);
       this.labels.push(label);
       this.keyToLabel.set(key, label);
       if (color) {
         this.keyToColor.set(key, color);
+      }
+      if (typeof units === 'string' && units.trim().length) {
+        this.keyToUnits.set(key, units);
+      }
+      if (Number.isFinite(decimals)) {
+        this.keyToDecimals.set(key, decimals);
       }
       this.keyToValueTransform.set(key, this.createValueTransform(entry));
     }
@@ -648,7 +660,9 @@ export class MiikueChartComponent implements OnInit {
           ts,
           value: transformedValue,
           name: seriesName,
-          color: this.keyToColor.get(baseKey)
+          color: this.keyToColor.get(baseKey),
+          units: this.keyToUnits.get(baseKey),
+          decimals: this.keyToDecimals.get(baseKey)
         });
 
         prevValue = transformedValue;

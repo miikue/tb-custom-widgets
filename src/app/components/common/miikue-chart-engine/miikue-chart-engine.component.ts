@@ -12,6 +12,8 @@ export interface ChartDataPoint {
   value: number;
   name: string;
   color?: string;
+  units?: string;
+  decimals?: number;
 }
 
 interface MiikueChartEngineCtx extends Partial<WidgetContext> {
@@ -63,6 +65,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   private windowResizeListener: (() => void) | null = null;
   private rawSeriesMap = new Map<string, SeriesPoint[]>();
   private seriesColorMap = new Map<string, string>();
+  private seriesFormatMap = new Map<string, { units?: string; decimals?: number }>();
   private fullRangeMinTs: number | null = null;
   private fullRangeMaxTs: number | null = null;
   private readonly maxPointsPerPixel = 1.25;
@@ -144,12 +147,15 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     }
 
     if (!chartData.length) {
+      this.seriesFormatMap.clear();
       this.renderEmptyConfiguredWindow();
       if (this.chartWorker) {
         this.pushChartDataToWorker();
       }
       return;
     }
+
+    this.updateSeriesFormats(chartData);
 
     if (this.chartWorker) {
       this.pushChartDataToWorker();
@@ -279,7 +285,10 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
         }
       },
       yAxis: {
-        type: 'value'
+        type: 'value',
+        axisLabel: {
+          formatter: (value: number) => this.formatYAxisLabel(value)
+        }
       },
       dataZoom: [
         {
@@ -326,7 +335,10 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
         }
       },
       yAxis: {
-        type: 'value'
+        type: 'value',
+        axisLabel: {
+          formatter: (value: number) => this.formatYAxisLabel(value)
+        }
       },
       dataZoom: this.chartOption.dataZoom,
       series: []
@@ -589,7 +601,10 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
         }
       },
       yAxis: {
-        type: 'value'
+        type: 'value',
+        axisLabel: {
+          formatter: (value: number) => this.formatYAxisLabel(value)
+        }
       },
       dataZoom: this.chartOption.dataZoom,
       series: echartsSeriesData
@@ -657,7 +672,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       const marker = item?.marker || '';
       const name = item?.seriesName || '';
       const value = Array.isArray(item?.value) ? item.value[1] : item?.value;
-      return `${marker}${name}: ${value}`;
+      return `${marker}${name}: ${this.formatSeriesValue(name, value)}`;
     });
 
     return [header, ...lines].join('<br/>');
@@ -684,6 +699,61 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       minute: '2-digit',
       second: '2-digit'
     });
+  }
+
+  private formatYAxisLabel(value: number): string {
+    return this.formatNumericValue(value, this.resolveDefaultDecimals(), this.resolveDefaultUnits());
+  }
+
+  private formatSeriesValue(seriesName: string, value: any): string {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return String(value ?? '');
+    }
+
+    const format = this.seriesFormatMap.get(seriesName);
+    const decimals = Number.isFinite(Number(format?.decimals))
+      ? Number(format?.decimals)
+      : this.resolveDefaultDecimals();
+    const units = (format?.units && String(format.units).trim().length)
+      ? String(format.units)
+      : this.resolveDefaultUnits();
+
+    return this.formatNumericValue(numeric, decimals, units);
+  }
+
+  private formatNumericValue(value: number, decimals?: number, units?: string): string {
+    const useDecimals = Number.isFinite(Number(decimals))
+      ? Math.max(0, Math.min(20, Number(decimals)))
+      : undefined;
+    const formatter = new Intl.NumberFormat('cs-CZ', {
+      minimumFractionDigits: useDecimals,
+      maximumFractionDigits: useDecimals
+    });
+    const formatted = formatter.format(value);
+    return units ? `${formatted} ${units}` : formatted;
+  }
+
+  private resolveDefaultDecimals(): number | undefined {
+    const value = Number((this.ctx as any)?.decimals);
+    return Number.isFinite(value) ? value : 3;
+  }
+
+  private resolveDefaultUnits(): string | undefined {
+    const value = (this.ctx as any)?.units;
+    return typeof value === 'string' && value.trim().length ? value : undefined;
+  }
+
+  private updateSeriesFormats(chartData: ChartDataPoint[]): void {
+    this.seriesFormatMap.clear();
+    for (const point of chartData) {
+      const decimals = Number(point?.decimals);
+      const units = typeof point?.units === 'string' ? point.units : undefined;
+      this.seriesFormatMap.set(point.name, {
+        units: units && units.trim().length ? units : undefined,
+        decimals: Number.isFinite(decimals) ? decimals : undefined
+      });
+    }
   }
 
   private getCurrentZoomRange(): { start: number; end: number } {

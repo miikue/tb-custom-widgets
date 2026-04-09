@@ -5,6 +5,8 @@ interface ChartDataPoint {
   value: number;
   name: string;
   color?: string;
+  units?: string;
+  decimals?: number;
 }
 
 type AggregationMode = 'seconds' | 'min' | 'hour';
