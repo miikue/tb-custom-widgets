@@ -1,0 +1,41 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #ffffff;
+}
+
+.miikue-kalendar {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.miikue-kalendar__header {
+  flex: 0 0 auto;
+  padding: 8px 10px 2px;
+}
+
+.miikue-kalendar__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.84);
+}
+
+.miikue-kalendar__subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.58);
+}
+
+.miikue-kalendar__chart {
+  flex: 1 1 auto;
+  min-height: 220px;
+  width: 100%;
+}
