@@ -12,6 +12,16 @@ interface ModeCache {
   pointsByKey: Map<string, ChartDataPoint>;
 }
 
+interface KeyValueTransformArgs {
+  time: number;
+  value: number;
+  prevValue?: number;
+  timePrev?: number;
+  prevOrigValue?: number;
+}
+
+type KeyValueTransform = (args: KeyValueTransformArgs) => number;
+
 @Component({
   selector: 'tb-miikue-chart',
   templateUrl: './miikue-chart.component.html',
@@ -30,6 +40,7 @@ export class MiikueChartComponent implements OnInit {
   isLoading = false;
   loadingProgressPercent = 0;
   loadingMessage = '';
+  isWidgetExpanded = false;
   private loadingMessagePrefix = '';
   readonly aggregationModes: Array<{ value: AggregationMode; label: string }> = [
     { value: 'seconds', label: 'Surová data' },
@@ -40,6 +51,7 @@ export class MiikueChartComponent implements OnInit {
   keys: string[] = [];
   private keyToLabel = new Map<string, string>();
   private keyToColor = new Map<string, string>();
+  private keyToValueTransform = new Map<string, KeyValueTransform>();
   private fetchSequence = 0;
   private readonly maxConcurrentChunkRequests = 8;
   private modeCache: Record<AggregationMode, ModeCache> = {
@@ -48,13 +60,41 @@ export class MiikueChartComponent implements OnInit {
     hour: this.createEmptyModeCache()
   };
 
+  get shouldRenderChart(): boolean {
+    return this.resolveShowSmallGraph() || this.isWidgetExpanded;
+  }
+
   async ngOnInit() {
     console.log('[MiikueChart] ngOnInit - loading data from API');
+    if (this.ctx?.$scope) {
+      this.ctx.$scope.miikueChartWidget = this;
+    }
+
+    this.updateExpandedState();
     this.selectedTimeWindow = this.getDefaultTimeWindow();
     this.initializeKeysAndLabels();
     this.prepareEngineCtx();
 
+    if (!this.shouldRenderChart) {
+      this.enterCollapsedIdleState();
+      return;
+    }
+
     await this.loadChartDataForCurrentWindow();
+  }
+
+  async onResize(): Promise<void> {
+    const wasRenderable = this.shouldRenderChart;
+    this.updateExpandedState();
+
+    if (!this.shouldRenderChart && wasRenderable) {
+      this.enterCollapsedIdleState();
+      return;
+    }
+
+    if (this.shouldRenderChart && !wasRenderable) {
+      await this.loadChartDataForCurrentWindow();
+    }
   }
 
 
@@ -101,6 +141,7 @@ export class MiikueChartComponent implements OnInit {
     this.labels = [];
     this.keyToLabel.clear();
     this.keyToColor.clear();
+    this.keyToValueTransform.clear();
 
     const dataEntries = (this.ctx as any)?.data || [];
     for (const entry of dataEntries) {
@@ -116,10 +157,121 @@ export class MiikueChartComponent implements OnInit {
       if (color) {
         this.keyToColor.set(key, color);
       }
+      this.keyToValueTransform.set(key, this.createValueTransform(entry));
     }
   }
 
+  private createValueTransform(entry: any): KeyValueTransform {
+    const dataKey = entry?.dataKey || {};
+    const settings = dataKey?.settings || {};
+    const keyName = String(dataKey?.name || '');
+    const keyLabel = String(dataKey?.label || keyName);
+
+    const multiplier = this.firstFiniteNumber([
+      settings?.valueMultiplier,
+      settings?.multiplier,
+      settings?.scaleFactor,
+      dataKey?.valueMultiplier,
+      dataKey?.multiplier
+    ]);
+
+    const divider = this.firstFiniteNumber([
+      settings?.valueDivider,
+      settings?.divider,
+      settings?.divisor,
+      settings?.divideBy,
+      dataKey?.valueDivider,
+      dataKey?.divider,
+      dataKey?.divisor
+    ]);
+
+    const postProcessor = this.buildPostProcessor(dataKey, keyName, keyLabel);
+
+    return ({ time, value: inputValue, prevValue, timePrev, prevOrigValue }: KeyValueTransformArgs): number => {
+      let value = inputValue;
+
+      if (multiplier != null) {
+        value = value * multiplier;
+      }
+
+      if (divider != null && divider !== 0) {
+        value = value / divider;
+      }
+
+      if (postProcessor) {
+        value = postProcessor({
+          time,
+          value,
+          prevValue,
+          timePrev,
+          prevOrigValue
+        });
+      }
+
+      return value;
+    };
+  }
+
+  private buildPostProcessor(dataKey: any, keyName: string, _keyLabel: string): KeyValueTransform | null {
+    const usePostProcessing = Boolean(dataKey?.usePostProcessing);
+    const postFuncBody = String(dataKey?.postFuncBody || '').trim();
+
+    if (!usePostProcessing || !postFuncBody) {
+      return null;
+    }
+
+    try {
+      let postProcessFn: unknown;
+      const looksLikeFunctionLiteral = /^\s*function\b/.test(postFuncBody)
+        || /^\s*\(/.test(postFuncBody)
+        || /^\s*[A-Za-z_$][\w$]*\s*=>/.test(postFuncBody);
+
+      if (looksLikeFunctionLiteral) {
+        postProcessFn = new Function(`return (${postFuncBody});`)();
+      } else {
+        postProcessFn = new Function('time', 'value', 'prevValue', 'timePrev', 'prevOrigValue', postFuncBody);
+      }
+
+      if (typeof postProcessFn !== 'function') {
+        console.warn('[MiikueChart] postFuncBody did not produce a function for key', keyName);
+        return null;
+      }
+
+      const typedPostProcessFn = postProcessFn as
+        (time: number, value: number, prevValue?: number, timePrev?: number, prevOrigValue?: number) => unknown;
+
+      return ({ time, value, prevValue, timePrev, prevOrigValue }: KeyValueTransformArgs): number => {
+        try {
+          const result = typedPostProcessFn(time, value, prevValue, timePrev, prevOrigValue);
+          const numeric = Number(result);
+          return Number.isFinite(numeric) ? numeric : value;
+        } catch (error) {
+          console.warn('[MiikueChart] postFuncBody runtime error for key', keyName, error);
+          return value;
+        }
+      };
+    } catch (error) {
+      console.warn('[MiikueChart] postFuncBody compile error for key', keyName, error);
+      return null;
+    }
+  }
+
+  private firstFiniteNumber(values: any[]): number | null {
+    for (const candidate of values) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
   private async loadChartDataForCurrentWindow(): Promise<void> {
+    if (!this.shouldRenderChart) {
+      this.enterCollapsedIdleState();
+      return;
+    }
+
     if (!this.selectedTimeWindow || !this.keys.length) {
       return;
     }
@@ -375,6 +527,49 @@ export class MiikueChartComponent implements OnInit {
     this.loadingMessagePrefix = '';
   }
 
+  private updateExpandedState(): void {
+    const dashboard: any = this.ctx?.dashboard;
+
+    if (typeof dashboard?.isWidgetExpanded === 'boolean') {
+      this.isWidgetExpanded = dashboard.isWidgetExpanded;
+      return;
+    }
+
+    this.isWidgetExpanded = false;
+  }
+
+  private resolveShowSmallGraph(): boolean {
+    const value = (this.ctx as any)?.settings?.showSmallGraph;
+
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (!normalized) {
+        return true;
+      }
+      if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') {
+        return false;
+      }
+      return true;
+    }
+
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+
+    return true;
+  }
+
+  private enterCollapsedIdleState(): void {
+    this.resetLoading();
+    this.chartData = [];
+    this.prepareEngineCtx();
+    this.ctx?.detectChanges?.();
+  }
+
   private resolvePrimaryDatasource(): { entityType: string; entityId: string } | null {
     const dsFromSub = (this.ctx as any)?.defaultSubscription?.datasources;
     const dsFromCtx = (this.ctx as any)?.datasources;
@@ -421,15 +616,47 @@ export class MiikueChartComponent implements OnInit {
       const keyData = response?.[apiKey] || [];
       // Use original baseKey as series name (without aggregation suffix)
       const seriesName = this.keyToLabel.get(baseKey) || baseKey;
+      const valueTransform = this.keyToValueTransform.get(baseKey);
+      const transformedPoints: ChartDataPoint[] = [];
+      let prevValue: number | undefined;
+      let prevOrigValue: number | undefined;
+      let timePrev: number | undefined;
 
-      return keyData
-        .map((item) => ({
-          ts: Number(item.ts),
-          value: Number(item.value),
+      for (const item of keyData) {
+        const ts = Number(item.ts);
+        const numericValue = Number(item.value);
+
+        if (!Number.isFinite(ts) || !Number.isFinite(numericValue)) {
+          continue;
+        }
+
+        const transformedValue = valueTransform
+          ? valueTransform({
+              time: ts,
+              value: numericValue,
+              prevValue,
+              timePrev,
+              prevOrigValue
+            })
+          : numericValue;
+
+        if (!Number.isFinite(transformedValue)) {
+          continue;
+        }
+
+        transformedPoints.push({
+          ts,
+          value: transformedValue,
           name: seriesName,
           color: this.keyToColor.get(baseKey)
-        }))
-        .filter((item) => Number.isFinite(item.ts) && Number.isFinite(item.value));
+        });
+
+        prevValue = transformedValue;
+        prevOrigValue = numericValue;
+        timePrev = ts;
+      }
+
+      return transformedPoints;
     } catch (error) {
       console.error('[MiikueChart] API error for key', apiKey, error);
       return [];

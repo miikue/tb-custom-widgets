@@ -1,0 +1,29 @@
+<div [formGroup]="configFormGroup">
+  <tb-datasources
+    [configMode]="basicMode"
+    hideDataKeys
+    formControlName="datasources">
+  </tb-datasources>
+
+  <tb-data-keys-panel
+    panelTitle="Body"
+    addKeyTitle="Přidat bod"
+    keySettingsTitle="Nastavení bodu"
+    removeKeyTitle="Odebrat bod"
+    noKeysText="Nejsou nastavené žádné body"
+    hideDataKeyColor
+    [datasourceType]="datasource?.type"
+    [deviceId]="datasource?.deviceId"
+    [entityAliasId]="datasource?.entityAliasId"
+    formControlName="dataKeys">
+  </tb-data-keys-panel>
+
+  <div class="tb-form-row" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
+    <input id="showSmallGraph" type="checkbox" formControlName="showSmallGraph" />
+    <label for="showSmallGraph">Zobrazovat graf i v malém modu</label>
+  </div>
+
+  <tb-widget-actions-panel
+    formControlName="actions">
+  </tb-widget-actions-panel>
+</div>

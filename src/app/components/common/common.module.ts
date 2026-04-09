@@ -28,6 +28,7 @@ import { MiikueChartLineBasicConfigComponent } from './miikue-chart-line/chart-s
 import { MiikueTimeWindowSelectorComponent } from './miikue-time-window-selector/miikue-time-window-selector.component';
 import { MiikueChartEngineComponent } from './miikue-chart-engine/miikue-chart-engine.component';
 import { MiikueChartComponent } from './miikue-chart/miikue-chart.component';
+import { MiikueChartBasicConfigComponent } from './miikue-chart/chart-settings/miikue-chart-basic-config.component';
 
 @NgModule({
   declarations: [
@@ -45,7 +46,8 @@ import { MiikueChartComponent } from './miikue-chart/miikue-chart.component';
     MiikueChartLineBasicConfigComponent,
     MiikueTimeWindowSelectorComponent,
     MiikueChartEngineComponent,
-    MiikueChartComponent
+    MiikueChartComponent,
+    MiikueChartBasicConfigComponent
   ],
   imports: [
     CommonModule,
@@ -75,7 +77,8 @@ import { MiikueChartComponent } from './miikue-chart/miikue-chart.component';
     MiikueChartLineBasicConfigComponent,
     MiikueTimeWindowSelectorComponent,
     MiikueChartEngineComponent,
-    MiikueChartComponent
+    MiikueChartComponent,
+    MiikueChartBasicConfigComponent
   ],
   providers: [
     { provide: MAT_DATE_LOCALE, useValue: 'cs-CZ' }

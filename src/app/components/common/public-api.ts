@@ -15,3 +15,4 @@ export * from './miikue-chart-line/chart-settings/miikue-chart-line-basic-config
 export * from './miikue-time-window-selector/miikue-time-window-selector.component';
 export * from './miikue-chart-engine/miikue-chart-engine.component';
 export * from './miikue-chart/miikue-chart.component';
+export * from './miikue-chart/chart-settings/miikue-chart-basic-config.component';
