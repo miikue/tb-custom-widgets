@@ -7,7 +7,7 @@ interface ChartDataPoint {
   color?: string;
 }
 
-type AggregationMode = 'seconds' | 'min' | 'hour' | 'day' | 'month';
+type AggregationMode = 'hour' | 'day' | 'month';
 type SeriesPoint = [number, number | null];
 type SeriesRole = 'spotreba' | 'export' | 'positiveBar';
 
@@ -17,8 +17,6 @@ interface ChartTimeWindow {
 }
 
 interface ChartEngineSettings {
-  rawGapBreakSeconds?: number;
-  minGapBreakMinutes?: number;
   hourGapBreakHours?: number;
   dayGapBreakDays?: number;
   monthGapBreakMonths?: number;
@@ -74,7 +72,7 @@ interface SeriesState {
 
 let seriesState = new Map<string, SeriesState>();
 let selectedWindow: ChartTimeWindow | null = null;
-let aggregationMode: AggregationMode = 'seconds';
+let aggregationMode: AggregationMode = 'hour';
 let settings: ChartEngineSettings = {};
 let fullRangeMinTs: number | null = null;
 let fullRangeMaxTs: number | null = null;
@@ -111,7 +109,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerInputMessage>) => {
 function handleSetData(message: SetDataMessage): void {
   seriesState = new Map<string, SeriesState>();
   selectedWindow = message.selectedTimeWindow || null;
-  aggregationMode = message.aggregationMode || 'seconds';
+  aggregationMode = message.aggregationMode || 'hour';
   settings = message.settings || {};
   fullRangeMinTs = null;
   fullRangeMaxTs = null;
@@ -380,19 +378,11 @@ function resolveGapThresholdMs(): number {
       return Number.isFinite(settings.dayGapBreakDays) && (settings.dayGapBreakDays as number) > 0
         ? (settings.dayGapBreakDays as number) * 24 * 60 * 60 * 1000
         : 24 * 60 * 60 * 1000;
-    case 'min':
-      return Number.isFinite(settings.minGapBreakMinutes) && (settings.minGapBreakMinutes as number) > 0
-        ? (settings.minGapBreakMinutes as number) * 60 * 1000
-        : 60 * 1000;
     case 'hour':
+    default:
       return Number.isFinite(settings.hourGapBreakHours) && (settings.hourGapBreakHours as number) > 0
         ? (settings.hourGapBreakHours as number) * 60 * 60 * 1000
         : 60 * 60 * 1000;
-    case 'seconds':
-    default:
-      return Number.isFinite(settings.rawGapBreakSeconds) && (settings.rawGapBreakSeconds as number) > 0
-        ? (settings.rawGapBreakSeconds as number) * 1000
-        : 5000;
   }
 }
 

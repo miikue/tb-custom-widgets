@@ -16,7 +16,7 @@ export interface SpotrebaGrafKwhChartDataPoint {
 
 interface MiikueSpotrebaGrafKwhEngineCtx extends Partial<WidgetContext> {
   chartData?: SpotrebaGrafKwhChartDataPoint[];
-  aggregationMode?: 'seconds' | 'min' | 'hour' | 'day' | 'month';
+    aggregationMode?: 'hour' | 'day' | 'month';
   selectedTimeWindow?: {
     startTs: number;
     endTs: number;
@@ -24,7 +24,7 @@ interface MiikueSpotrebaGrafKwhEngineCtx extends Partial<WidgetContext> {
   color?: string;
 }
 
-type AggregationMode = 'seconds' | 'min' | 'hour' | 'day' | 'month';
+type AggregationMode = 'hour' | 'day' | 'month';
 type SeriesRole = 'spotreba' | 'export' | 'positiveBar';
 type SeriesPoint = [number, number | null];
 
@@ -540,14 +540,6 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
     return adjusted;
   }
 
-  private prepareSeriesDataForRender(seriesName: string, points: SeriesPoint[]): SeriesPoint[] {
-    if (this.getSeriesRole(seriesName) === 'spotreba') {
-      return this.decimateForCurrentWidth(points);
-    }
-
-    return this.toBarSeriesData(points);
-  }
-
   private buildSeriesOption(
     name: string,
     data: SeriesPoint[],
@@ -684,8 +676,6 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       selectedTimeWindow: this.ctx?.selectedTimeWindow,
       aggregationMode: this.ctx?.aggregationMode || 'hour',
       settings: {
-        rawGapBreakSeconds: Number((this.ctx as any)?.settings?.rawGapBreakSeconds),
-        minGapBreakMinutes: Number((this.ctx as any)?.settings?.minGapBreakMinutes),
         hourGapBreakHours: Number((this.ctx as any)?.settings?.hourGapBreakHours),
         dayGapBreakDays: Number((this.ctx as any)?.settings?.dayGapBreakDays),
         monthGapBreakMonths: Number((this.ctx as any)?.settings?.monthGapBreakMonths)
@@ -942,12 +932,8 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
       case 'day':
         return 24 * 60 * 60 * 1000;
       case 'hour':
-        return 60 * 60 * 1000;
-      case 'min':
-        return 60 * 1000;
-      case 'seconds':
       default:
-        return 1000;
+        return 60 * 60 * 1000;
     }
   }
 
@@ -1051,7 +1037,7 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
 
   private getAggregationMode(): AggregationMode {
     const mode = this.ctx?.aggregationMode;
-    if (mode === 'seconds' || mode === 'min' || mode === 'hour' || mode === 'day' || mode === 'month') {
+    if (mode === 'hour' || mode === 'day' || mode === 'month') {
       return mode;
     }
     return 'hour';
@@ -1210,8 +1196,6 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
 
   private resolveGapThresholdMs(): number {
     const mode: AggregationMode = this.ctx?.aggregationMode || 'hour';
-    const rawGapBreakSeconds = Number((this.ctx as any)?.settings?.rawGapBreakSeconds);
-    const minGapBreakMinutes = Number((this.ctx as any)?.settings?.minGapBreakMinutes);
     const hourGapBreakHours = Number((this.ctx as any)?.settings?.hourGapBreakHours);
     const dayGapBreakDays = Number((this.ctx as any)?.settings?.dayGapBreakDays);
     const monthGapBreakMonths = Number((this.ctx as any)?.settings?.monthGapBreakMonths);
@@ -1224,20 +1208,11 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
         return Number.isFinite(dayGapBreakDays) && dayGapBreakDays > 0
           ? dayGapBreakDays * 24 * 60 * 60 * 1000
           : 24 * 60 * 60 * 1000;
-      case 'min':
-        return Number.isFinite(minGapBreakMinutes) && minGapBreakMinutes > 0
-          ? minGapBreakMinutes * 60 * 1000
-          : 60 * 1000;
       case 'hour':
+      default:
         return Number.isFinite(hourGapBreakHours) && hourGapBreakHours > 0
           ? hourGapBreakHours * 60 * 60 * 1000
           : 60 * 60 * 1000;
-      case 'seconds':
-      default:
-        // Raw data is naturally jittery; default to 5s to avoid overly aggressive breaks.
-        return Number.isFinite(rawGapBreakSeconds) && rawGapBreakSeconds > 0
-          ? rawGapBreakSeconds * 1000
-          : 5000;
     }
   }
 

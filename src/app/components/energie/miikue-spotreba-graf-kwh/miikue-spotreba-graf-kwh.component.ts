@@ -7,7 +7,7 @@ import {
 import { TimeWindow } from '../../common/miikue-time-window-selector/miikue-time-window-selector.component';
 import { firstValueFrom } from 'rxjs';
 
-type AggregationMode = 'seconds' | 'min' | 'hour' | 'day' | 'month';
+type AggregationMode = 'hour' | 'day' | 'month';
 
 interface ModeCache {
   coveredStartTs: number | null;
@@ -44,9 +44,6 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
   loadingProgressPercent = 0;
   loadingMessage = '';
   private loadingMessagePrefix = '';
-  readonly aggregationModes: Array<{ value: AggregationMode; label: string }> = [
-    { value: 'hour', label: 'Agregace hour' }
-  ];
   labels: string[] = [];
   keys: string[] = [];
   private keyToLabel = new Map<string, string>();
@@ -55,8 +52,6 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
   private fetchSequence = 0;
   private readonly maxConcurrentChunkRequests = 8;
   private modeCache: Record<AggregationMode, ModeCache> = {
-    seconds: this.createEmptyModeCache(),
-    min: this.createEmptyModeCache(),
     hour: this.createEmptyModeCache(),
     day: this.createEmptyModeCache(),
     month: this.createEmptyModeCache()
@@ -81,20 +76,6 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
       endIso: timeWindow?.endTs ? new Date(timeWindow.endTs).toISOString() : null
     });
 
-    await this.loadChartDataForCurrentWindow();
-  }
-
-  async onAggregationModeChange(mode: AggregationMode): Promise<void> {
-    if (mode !== 'hour') {
-      mode = 'hour';
-    }
-
-    if (this.selectedAggregationMode === mode) {
-      return;
-    }
-
-    this.selectedAggregationMode = mode;
-    // Reload data with new aggregation mode (different API keys)
     await this.loadChartDataForCurrentWindow();
   }
 
@@ -261,7 +242,7 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
     const fetchId = ++this.fetchSequence;
     const cache = this.modeCache[mode];
 
-    const fetchStartTs = this.resolveFetchWindowStart(mode, normalizedStartTs, normalizedEndTs, windowDurationMs);
+    const fetchStartTs = this.resolveFetchWindowStart(normalizedStartTs);
     this.loadingMessagePrefix = this.buildLoadingPrefix(mode, normalizedStartTs, normalizedEndTs, fetchStartTs);
     const missingRanges = this.resolveMissingRanges(cache, fetchStartTs, normalizedEndTs);
     const requestFactories: Array<() => Promise<ChartDataPoint[]>> = [];
@@ -323,32 +304,15 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
       case 'day':
         // Daily aggregation is chunked by month.
         return 31 * 24 * 60 * 60 * 1000;
-      case 'min':
-        // Minute aggregations are chunked by day.
-        return 24 * 60 * 60 * 1000;
       case 'hour':
+      default:
         // Hour aggregations are chunked by week.
         return 7 * 24 * 60 * 60 * 1000;
-      case 'seconds':
-      default:
-        // Raw samples are chunked by hour.
-        return 60 * 60 * 1000;
     }
   }
 
-  private resolveFetchWindowStart(mode: AggregationMode, startTs: number, endTs: number, windowDurationMs: number): number {
-    const monthMs = 31 * 24 * 60 * 60 * 1000;
-    const yearMs = 365 * 24 * 60 * 60 * 1000;
-
-    switch (mode) {
-      case 'seconds':
-        return windowDurationMs > monthMs ? Math.max(startTs, endTs - monthMs + 1) : startTs;
-      case 'min':
-        return windowDurationMs > yearMs ? Math.max(startTs, endTs - yearMs + 1) : startTs;
-      case 'hour':
-      default:
-        return startTs;
-    }
+  private resolveFetchWindowStart(startTs: number): number {
+    return startTs;
   }
 
   private buildLoadingPrefix(mode: AggregationMode, fullStartTs: number, fullEndTs: number, fetchStartTs: number): string {
@@ -361,10 +325,6 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
     }
 
     switch (mode) {
-      case 'seconds':
-        return 'Načítám raw data';
-      case 'min':
-        return 'Načítám minutová data';
       case 'hour':
         return 'Načítám hodinová data';
       case 'day':
@@ -555,7 +515,7 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
     }
 
     // Day/month modes are assembled client-side from hourly buckets.
-    const queryMode: AggregationMode = (mode === 'day' || mode === 'month') ? 'hour' : mode;
+    const queryMode: AggregationMode = 'hour';
     const apiKey = this.getAggregatedKey(baseKey, queryMode);
 
     const url = `/api/plugins/telemetry/${source.entityType}/${source.entityId}/values/timeseries`
@@ -703,11 +663,6 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
         return this.getLocalDayStartTs(timestamp);
       case 'month':
         return this.getLocalMonthStartTs(timestamp);
-      case 'min': {
-        const bucketMs = 60 * 1000;
-        return Math.floor((timestamp - bucketMs / 2) / bucketMs) * bucketMs;
-      }
-      case 'seconds':
       default:
         return timestamp;
     }
@@ -726,17 +681,9 @@ export class MiikueSpotrebaGrafKwhComponent implements OnInit {
   // Get API key with aggregation suffix based on selected mode
   private getAggregatedKey(baseKey: string, mode: AggregationMode): string {
     switch (mode) {
-      case 'min':
-        return `${baseKey}_min`;
       case 'hour':
-        return `${baseKey}_hour`;
-      case 'day':
-        return `${baseKey}_day`;
-      case 'month':
-        return `${baseKey}_month`;
-      case 'seconds':
       default:
-        return baseKey;
+        return `${baseKey}_hour`;
     }
   }
 
