@@ -1,4 +1,4 @@
-<div class="iris-x">
+<div class="iris-x" [ngStyle]="themeVars">
   <div class="iris-x__bg-glow"></div>
 
   <div #diagramRef class="iris-x__diagram">
@@ -6,6 +6,7 @@
       <path id="path-fve-grid" class="flow flow--fve-grid" [attr.d]="fveToGridPath"></path>
       <path id="path-fve-home" class="flow flow--fve-home" [attr.d]="fveToHomePath"></path>
       <path id="path-grid-home" class="flow flow--grid-home" [attr.d]="gridToHomePath"></path>
+      <path *ngIf="showMaric" id="path-fve-maric" class="flow flow--fve-maric" [attr.d]="fveToMaricPath"></path>
 
       <g class="flow-bubbles">
         <circle
@@ -49,39 +50,56 @@
             <path d="M5.3 18.7L7.1 16.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
           </svg>
         </div>
-        <div class="energy-node__value">{{ fveValueText }} {{ valueUnitText }}</div>
+        <div class="energy-node__value">{{ fveValueText }} {{ fveUnitText }}</div>
       </div>
       <div class="energy-node__label-block energy-node__label-block--top">
         <div class="energy-node__name">FVE</div>
       </div>
     </section>
 
-    <section class="energy-node energy-node--grid" aria-label="Distribucni sit" [style.left.px]="gridNodeLeft" [style.top.px]="gridNodeTop" [style.width.px]="nodeDiameterPx" [style.height.px]="nodeDiameterPx">
+    <section *ngIf="showMaric" class="energy-node energy-node--maric" aria-label="Mařič" [style.left.px]="maricNodeLeft" [style.top.px]="maricNodeTop" [style.width.px]="nodeDiameterPx" [style.height.px]="nodeDiameterPx">
+      <div class="energy-node__ring">
+        <div class="energy-node__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 6.5H17V9.5H7V6.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+            <path d="M7 14.5H17V17.5H7V14.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+            <path d="M10 9.5V14.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M14 9.5V14.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+        </div>
+        <div class="energy-node__value">{{ maricValueText }} {{ maricUnitText }}</div>
+      </div>
+      <div class="energy-node__label-block energy-node__label-block--top">
+        <div class="energy-node__name">Mařič</div>
+      </div>
+    </section>
+
+    <section class="energy-node energy-node--grid" aria-label="Distribuční síť" [style.left.px]="gridNodeLeft" [style.top.px]="gridNodeTop" [style.width.px]="nodeDiameterPx" [style.height.px]="nodeDiameterPx">
       <div class="energy-node__ring">
         <div class="energy-node__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M13.5 2.5L5.8 13.3H11L10.5 21.5L18.2 10.7H13L13.5 2.5Z" fill="currentColor"></path>
           </svg>
         </div>
-        <div class="energy-node__value" [class.energy-node__value--export]="isGridExport">{{ gridValueText }} {{ valueUnitText }}</div>
+        <div class="energy-node__value" [class.energy-node__value--export]="isGridExport">{{ gridValueText }} {{ gridUnitText }}</div>
       </div>
       <div class="energy-node__label-block energy-node__label-block--bottom">
-        <div class="energy-node__name">Distribucni sit</div>
+        <div class="energy-node__name">Distribuční síť</div>
         <div class="energy-node__hint">{{ gridFlowText }}</div>
       </div>
     </section>
 
-    <section class="energy-node energy-node--home" aria-label="Spotreba" [style.left.px]="homeNodeLeft" [style.top.px]="homeNodeTop" [style.width.px]="nodeDiameterPx" [style.height.px]="nodeDiameterPx">
+    <section class="energy-node energy-node--home" aria-label="Spotřeba" [style.left.px]="homeNodeLeft" [style.top.px]="homeNodeTop" [style.width.px]="nodeDiameterPx" [style.height.px]="nodeDiameterPx">
       <div class="energy-node__ring">
         <div class="energy-node__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 10.2L12 3.5L20 10.2V20.5H14.5V14.8H9.5V20.5H4V10.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
           </svg>
         </div>
-        <div class="energy-node__value">{{ homeValueText }} {{ valueUnitText }}</div>
+        <div class="energy-node__value">{{ homeValueText }} {{ homeUnitText }}</div>
       </div>
       <div class="energy-node__label-block energy-node__label-block--bottom">
-        <div class="energy-node__name">Spotreba</div>
+        <div class="energy-node__name">Spotřeba</div>
       </div>
     </section>
   </div>

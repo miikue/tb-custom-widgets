@@ -2,6 +2,7 @@
   --text-main: #121722;
   --text-soft: #5b6270;
   --fve: #efb44f;
+  --maric: #d97706;
   --grid: #2b38eb;
   --home: #111111;
 
@@ -49,7 +50,11 @@
 }
 
 .flow--fve-home {
-  stroke: #e49412;
+  stroke: var(--fve-home);
+}
+
+.flow--fve-maric {
+  stroke: var(--maric);
 }
 
 .flow--grid-home {
@@ -72,7 +77,11 @@
 }
 
 .flow-bubble--fve-home {
-  fill: #e49412;
+  fill: var(--fve-home);
+}
+
+.flow-bubble--fve-maric {
+  fill: var(--maric);
 }
 
 .flow-bubble--grid-home {
@@ -163,6 +172,12 @@
 .energy-node--fve {
   .energy-node__ring {
     border-color: var(--fve);
+  }
+}
+
+.energy-node--maric {
+  .energy-node__ring {
+    border-color: var(--maric);
   }
 }
 
