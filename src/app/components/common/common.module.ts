@@ -23,8 +23,6 @@ import { MiikueDowlanderComponent } from './miikue-dowlander/miikue-dowlander.co
 import { MiikueCommunicationComponent } from './miikue-communication/miikue-communication.component';
 import { MiikueStavyComponent } from './miikue-stavy/miikue-stavy.component';
 import { MiikueNotifikationCenterComponent } from './miikue-notifikation-center/miikue-notifikation-center.component';
-import { MiikueChartLineComponent } from './miikue-chart-line/miikue-chart-line.component';
-import { MiikueChartLineBasicConfigComponent } from './miikue-chart-line/chart-settings/miikue-chart-line-basic-config.component';
 import { MiikueTimeWindowSelectorComponent } from './miikue-time-window-selector/miikue-time-window-selector.component';
 import { MiikueChartEngineComponent } from './miikue-chart-engine/miikue-chart-engine.component';
 import { MiikueChartComponent } from './miikue-chart/miikue-chart.component';
@@ -42,8 +40,6 @@ import { MiikueChartBasicConfigComponent } from './miikue-chart/chart-settings/m
     MiikueCommunicationComponent,
     MiikueStavyComponent,
     MiikueNotifikationCenterComponent,
-    MiikueChartLineComponent,
-    MiikueChartLineBasicConfigComponent,
     MiikueTimeWindowSelectorComponent,
     MiikueChartEngineComponent,
     MiikueChartComponent,
@@ -73,8 +69,6 @@ import { MiikueChartBasicConfigComponent } from './miikue-chart/chart-settings/m
     MiikueCommunicationComponent,
     MiikueStavyComponent,
     MiikueNotifikationCenterComponent,
-    MiikueChartLineComponent,
-    MiikueChartLineBasicConfigComponent,
     MiikueTimeWindowSelectorComponent,
     MiikueChartEngineComponent,
     MiikueChartComponent,
