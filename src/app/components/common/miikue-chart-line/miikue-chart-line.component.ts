@@ -70,7 +70,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
   public legendData: LegendData;
   public legendKeys: Array<LegendKey>;
   public showLegend: boolean;
-  public selectedDataDisplayMode: DataDisplayMode = 'seconds';
+  public selectedDataDisplayMode: DataDisplayMode = 'min';
   public readonly dataDisplayModes: Array<{ value: DataDisplayMode; label: string }> = [
     { value: 'seconds', label: 'Sekundy' },
     { value: 'min', label: 'Min agr' },
@@ -624,7 +624,7 @@ export class MiikueChartLineComponent implements OnInit, AfterViewInit, OnDestro
     if (rawMode === 'seconds' || rawMode === 'min' || rawMode === 'hour') {
       return rawMode;
     }
-    return 'seconds';
+    return 'min';
   }
 
   private isSortedByTimestamp(points: Array<any>): boolean {

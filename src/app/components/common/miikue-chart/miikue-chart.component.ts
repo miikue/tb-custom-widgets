@@ -26,7 +26,7 @@ export class MiikueChartComponent implements OnInit {
   engineCtx: any = {};
   chartData: ChartDataPoint[] = [];
   selectedTimeWindow: TimeWindow;
-  selectedAggregationMode: AggregationMode = 'seconds';
+  selectedAggregationMode: AggregationMode = 'min';
   isLoading = false;
   loadingProgressPercent = 0;
   loadingMessage = '';
