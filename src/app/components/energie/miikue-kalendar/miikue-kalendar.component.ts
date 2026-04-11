@@ -56,6 +56,8 @@ export class MiikueKalendarComponent implements OnInit, OnChanges, AfterViewInit
   private readonly dayMs = 24 * 60 * 60 * 1000;
   private readonly yearDays = 365;
   private readonly displayUnit = 'kW';
+  private readonly autoRefreshIntervalMs = 60 * 60 * 1000;
+  private autoRefreshTimerId: number | null = null;
   private loadSequence = 0;
 
   ngOnInit(): void {
@@ -64,6 +66,7 @@ export class MiikueKalendarComponent implements OnInit, OnChanges, AfterViewInit
     }
 
     this.onInit();
+    this.setupAutoRefresh();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -95,6 +98,8 @@ export class MiikueKalendarComponent implements OnInit, OnChanges, AfterViewInit
   }
 
   ngOnDestroy(): void {
+    this.clearAutoRefresh();
+
     if (this.windowResizeListener) {
       window.removeEventListener('resize', this.windowResizeListener);
       this.windowResizeListener = null;
@@ -114,12 +119,30 @@ export class MiikueKalendarComponent implements OnInit, OnChanges, AfterViewInit
     this.onDataUpdated();
   }
 
+  public onDestroy(): void {
+    this.clearAutoRefresh();
+  }
+
   public onDataUpdated(): void {
     void this.loadAndRenderYearHeatmap();
   }
 
   public onResize(): void {
     this.chart?.resize();
+  }
+
+  private setupAutoRefresh(): void {
+    this.clearAutoRefresh();
+    this.autoRefreshTimerId = window.setInterval(() => {
+      void this.loadAndRenderYearHeatmap();
+    }, this.autoRefreshIntervalMs);
+  }
+
+  private clearAutoRefresh(): void {
+    if (this.autoRefreshTimerId != null) {
+      window.clearInterval(this.autoRefreshTimerId);
+      this.autoRefreshTimerId = null;
+    }
   }
 
   private async loadAndRenderYearHeatmap(): Promise<void> {

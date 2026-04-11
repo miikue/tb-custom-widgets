@@ -85,7 +85,6 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['ctx'] && this.chart) {
-      console.log('[MiikueChartEngine] ctx changed, updating...');
       this.updateChart();
     }
   }
@@ -94,7 +93,6 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     //console.log('[MiikueChartEngine] ngAfterViewInit - initializing chart');
     this.initializeChart();
     this.cdr.detectChanges();
-    console.log(this.ctx);
   }
 
   private initializeChart() {
@@ -171,8 +169,6 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     this.fullRangeMaxTs = null;
 
     if (chartData.length) {
-      console.log('[MiikueChartEngine] updateChart - processing', chartData.length, 'data points');
-
       // Group data by name
       const seriesMap = new Map<string, Array<{ts: number; value: number}>>();
       
@@ -309,7 +305,6 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     // Set option
     this.chart.setOption(this.chartOption, { notMerge: true });
     this.resetZoomTracking();
-    console.log('[MiikueChartEngine] Chart option set');
   }
 
   private renderEmptyConfiguredWindow(): void {
@@ -482,17 +477,30 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       return;
     }
 
+    const workerUrl = this.resolveWorkerUrl('./miikue-chart-engine.worker');
+    if (!workerUrl) {
+      this.disposeWorker();
+      return;
+    }
+
     try {
-      this.chartWorker = new Worker(new URL('./miikue-chart-engine.worker', import.meta.url), { type: 'module' });
+      this.chartWorker = new Worker(workerUrl, { type: 'module' });
       this.chartWorker.onmessage = (event: MessageEvent<WorkerMessage>) => {
         this.handleWorkerMessage(event.data);
       };
       this.chartWorker.onerror = () => {
         this.disposeWorker();
       };
-    } catch (error) {
-      console.warn('[MiikueChartEngine] Worker init failed, falling back to sync mode', error);
+    } catch {
       this.disposeWorker();
+    }
+  }
+
+  private resolveWorkerUrl(relativePath: string): URL | null {
+    try {
+      return new URL(relativePath, import.meta.url);
+    } catch {
+      return null;
     }
   }
 

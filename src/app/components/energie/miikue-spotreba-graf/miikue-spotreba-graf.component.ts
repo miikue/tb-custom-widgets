@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, ViewChild } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { WidgetContext } from '@home/models/widget-component.models';
 import {
   SpotrebaGrafChartDataPoint as ChartDataPoint,
@@ -31,7 +31,7 @@ type KeyValueTransform = (args: KeyValueTransformArgs) => number;
   styleUrls: ['./miikue-spotreba-graf.component.scss'],
   standalone: false
 })
-export class MiikueSpotrebaGrafComponent implements OnInit {
+export class MiikueSpotrebaGrafComponent implements OnInit, OnDestroy {
 
   @Input() ctx: WidgetContext;
   @ViewChild(MiikueSpotrebaGrafEngineComponent) chartEngine?: MiikueSpotrebaGrafEngineComponent;
@@ -54,6 +54,8 @@ export class MiikueSpotrebaGrafComponent implements OnInit {
   private keyToColor = new Map<string, string>();
   private keyToValueTransform = new Map<string, KeyValueTransform>();
   private fetchSequence = 0;
+  private autoRefreshTimerId: number | null = null;
+  private readonly autoRefreshIntervalMs = 60 * 60 * 1000;
   private readonly maxConcurrentChunkRequests = 8;
   private modeCache: Record<AggregationMode, ModeCache> = {
     seconds: this.createEmptyModeCache(),
@@ -68,6 +70,15 @@ export class MiikueSpotrebaGrafComponent implements OnInit {
     this.prepareEngineCtx();
 
     await this.loadChartDataForCurrentWindow();
+    this.setupAutoRefresh();
+  }
+
+  ngOnDestroy(): void {
+    this.clearAutoRefresh();
+  }
+
+  public onDestroy(): void {
+    this.clearAutoRefresh();
   }
 
 
@@ -111,6 +122,20 @@ export class MiikueSpotrebaGrafComponent implements OnInit {
 
   onSavePng(): void {
     this.chartEngine?.saveAsPng();
+  }
+
+  private setupAutoRefresh(): void {
+    this.clearAutoRefresh();
+    this.autoRefreshTimerId = window.setInterval(() => {
+      void this.loadChartDataForCurrentWindow();
+    }, this.autoRefreshIntervalMs);
+  }
+
+  private clearAutoRefresh(): void {
+    if (this.autoRefreshTimerId != null) {
+      window.clearInterval(this.autoRefreshTimerId);
+      this.autoRefreshTimerId = null;
+    }
   }
 
   private initializeKeysAndLabels(): void {
