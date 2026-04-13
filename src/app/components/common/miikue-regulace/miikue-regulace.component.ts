@@ -103,8 +103,6 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
           this.selectedOptionValue = null;
           this.currentMode = '-';
           this.modeColor = '#94a3b8';
-
-          this.cd.detectChanges();
           return;
       }
 
@@ -158,7 +156,6 @@ export class MiikueRegulaceComponent implements OnInit, OnChanges {
               }
           }
       }
-      this.cd.detectChanges();
   }
 
   private formatTruncated(value: number, decimals: number): string {
