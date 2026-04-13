@@ -65,15 +65,17 @@
   border-radius: 8px;
   box-shadow: 0 8px 25px rgba(0,0,0,0.2);
   border: 1px solid rgba(15, 23, 42, 0.16);
-  width: min(1100px, calc(100vw - 24px));
+  width: min(860px, calc(100vw - 24px));
+  height: min(72vh, 560px);
   max-height: calc(100vh - 24px);
   overflow: auto;
 
   .popup-content {
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 210px minmax(300px, 1fr);
     align-items: stretch;
-    min-width: 900px;
+    min-width: 720px;
+    min-height: 100%;
   }
 
   .quick-selections {
@@ -113,23 +115,39 @@
 
   .custom-selection {
     display: grid;
-    grid-template-columns: 320px 200px;
+    grid-template-columns: minmax(260px, 1fr) 180px;
     gap: 24px;
     padding: 20px;
     align-items: flex-start;
     min-width: 0;
+    height: 100%;
 
     .calendar-container {
-      width: 320px;
-      min-width: 320px;
-      min-height: 320px;
+      width: 100%;
+      min-width: 260px;
+      height: 100%;
+      min-height: 0;
       overflow: visible;
+      display: flex;
+      align-items: stretch;
 
       .date-inputs {
         display: flex;
         flex-direction: column;
         gap: 8px;
         margin-bottom: 14px;
+      }
+
+      mat-card {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: stretch;
+      }
+
+      mat-calendar {
+        width: 100%;
+        height: 100%;
       }
     }
 
@@ -138,9 +156,10 @@
       flex-direction: column;
       justify-content: center;
       gap: 20px;
-      width: 200px;
-      min-width: 200px;
+      width: 180px;
+      min-width: 180px;
       padding-top: 10px;
+      height: 100%;
 
       .form-group.time-inputs {
         display: flex;
@@ -208,12 +227,14 @@
 @media (max-width: 900px) {
   .popup-surface {
     width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
     max-height: calc(100vh - 16px);
 
     .popup-content {
       min-width: 0;
       display: grid;
       grid-template-columns: 1fr;
+      min-height: 100%;
     }
 
     .quick-selections {
@@ -226,16 +247,19 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: 12px;
+      height: auto;
 
       .calendar-container {
         width: 100%;
         min-width: 0;
         min-height: 0;
+        height: auto;
       }
 
       .time-and-actions {
         width: 100%;
         min-width: 0;
+        height: auto;
       }
     }
   }

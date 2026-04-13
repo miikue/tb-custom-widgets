@@ -8,9 +8,12 @@ import {
   ChangeDetectorRef,
   ViewEncapsulation,
   ElementRef,
+  ViewChild,
+  Inject,
   Renderer2,
   output
 } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { DateRange } from '@angular/material/datepicker';
 
 export interface TimeWindow {
@@ -28,6 +31,7 @@ export interface TimeWindow {
 export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnDestroy {
 
   @Input() initialTimeWindow!: TimeWindow;
+  @ViewChild('popupContainer') popupContainer?: ElementRef<HTMLElement>;
 
   timeWindowChange = output<TimeWindow>();
 
@@ -44,11 +48,13 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
   private uiDebugEnabled = false;
   private hostDashboardWidget: HTMLElement | null = null;
   private hostDashboardWidgetOriginalZIndex: string | null = null;
+  private popupAttachedToBody = false;
 
   constructor(
     private cd: ChangeDetectorRef,
     private elementRef: ElementRef<HTMLElement>,
-    private renderer: Renderer2
+    private renderer: Renderer2,
+    @Inject(DOCUMENT) private document: Document
   ) {}
 
   ngOnInit(): void {
@@ -70,10 +76,6 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
     }
   }
 
-  ngOnDestroy(): void {
-    this.restoreHostDashboardWidgetLayer();
-  }
-
   togglePopup(event?: MouseEvent): void {
     if (event) {
       event.stopPropagation();
@@ -86,6 +88,7 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
 
     const initial = this.initialTimeWindow || this.calculateInitialWindow();
     this.updateStateFromTimeWindow(initial);
+    this.attachPopupToBody();
     this.isPopupOpen = true;
     this.elevateHostDashboardWidgetLayer();
     this.cd.detectChanges();
@@ -182,6 +185,8 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
       this.selectedRange = new DateRange<Date>(picked, null);
       this.customStartDate = this.formatDateForInput(picked);
       this.customEndDate = '';
+      this.customStartTime = '00:00';
+      this.customEndTime = '23:59';
       this.cd.detectChanges();
       return;
     }
@@ -194,6 +199,8 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
     this.selectedRange = normalizedRange;
     this.customStartDate = this.formatDateForInput(normalizedRange.start!);
     this.customEndDate = this.formatDateForInput(normalizedRange.end!);
+    this.customStartTime = '00:00';
+    this.customEndTime = '23:59';
     this.cd.detectChanges();
   }
 
@@ -259,6 +266,27 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
     }
   }
 
+  private attachPopupToBody(): void {
+    const popupElement = this.popupContainer?.nativeElement;
+    if (!popupElement || this.popupAttachedToBody) {
+      return;
+    }
+
+    this.renderer.appendChild(this.document.body, popupElement);
+    this.renderer.setStyle(popupElement, 'z-index', '2147483647');
+    this.popupAttachedToBody = true;
+  }
+
+  private detachPopupFromBody(): void {
+    const popupElement = this.popupContainer?.nativeElement;
+    if (!popupElement || !this.popupAttachedToBody) {
+      return;
+    }
+
+    this.renderer.removeChild(this.document.body, popupElement);
+    this.popupAttachedToBody = false;
+  }
+
   private elevateHostDashboardWidgetLayer(): void {
     if (!this.hostDashboardWidget) {
       return;
@@ -307,5 +335,10 @@ export class MiikueTimeWindowSelectorComponent implements OnInit, OnChanges, OnD
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  ngOnDestroy(): void {
+    this.detachPopupFromBody();
+    this.restoreHostDashboardWidgetLayer();
   }
 }
