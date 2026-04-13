@@ -817,7 +817,22 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   }
 
   private resolveVisibleRange(): { minTs: number | null; maxTs: number | null } {
-    if (this.fullRangeMinTs == null || this.fullRangeMaxTs == null) {
+    const selectedWindow = this.ctx?.selectedTimeWindow;
+    const selectedStart = Number(selectedWindow?.startTs);
+    const selectedEnd = Number(selectedWindow?.endTs);
+
+    let baseMinTs: number | null = null;
+    let baseMaxTs: number | null = null;
+
+    if (Number.isFinite(selectedStart) && Number.isFinite(selectedEnd)) {
+      baseMinTs = Math.min(selectedStart, selectedEnd);
+      baseMaxTs = Math.max(selectedStart, selectedEnd);
+    } else if (this.fullRangeMinTs != null && this.fullRangeMaxTs != null) {
+      baseMinTs = this.fullRangeMinTs;
+      baseMaxTs = this.fullRangeMaxTs;
+    }
+
+    if (baseMinTs == null || baseMaxTs == null) {
       return { minTs: null, maxTs: null };
     }
 
@@ -827,16 +842,16 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     const end = Number(dataZoom?.end);
 
     if (!Number.isFinite(start) || !Number.isFinite(end)) {
-      return { minTs: this.fullRangeMinTs, maxTs: this.fullRangeMaxTs };
+      return { minTs: baseMinTs, maxTs: baseMaxTs };
     }
 
     const minPercent = Math.max(0, Math.min(100, Math.min(start, end)));
     const maxPercent = Math.max(0, Math.min(100, Math.max(start, end)));
-    const span = this.fullRangeMaxTs - this.fullRangeMinTs;
+    const span = baseMaxTs - baseMinTs;
 
     return {
-      minTs: this.fullRangeMinTs + (span * minPercent) / 100,
-      maxTs: this.fullRangeMinTs + (span * maxPercent) / 100
+      minTs: baseMinTs + (span * minPercent) / 100,
+      maxTs: baseMinTs + (span * maxPercent) / 100
     };
   }
 
