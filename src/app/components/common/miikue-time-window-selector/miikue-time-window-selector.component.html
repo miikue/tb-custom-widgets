@@ -24,14 +24,12 @@
         </div>
         <div class="custom-selection">
           <div class="calendar-container">
-            <div class="form-group date-inputs">
-              <label for="tw-start-date">Datum od</label>
-              <input id="tw-start-date" type="date" class="datetime-input" [(ngModel)]="customStartDate" (change)="onDateInputChange()">
-            </div>
-            <div class="form-group date-inputs">
-              <label for="tw-end-date">Datum do</label>
-              <input id="tw-end-date" type="date" class="datetime-input" [(ngModel)]="customEndDate" (change)="onDateInputChange()">
-            </div>
+<mat-card>
+  <mat-calendar 
+    [selected]="selectedRange" 
+    (selectedChange)="_onSelectedChange($event)">
+  </mat-calendar>
+</mat-card>
           </div>
           <div class="time-and-actions">
               
