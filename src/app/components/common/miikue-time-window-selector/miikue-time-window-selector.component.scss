@@ -227,8 +227,8 @@
 @media (max-width: 900px) {
   .popup-surface {
     width: calc(100vw - 16px);
-    height: calc(100vh - 16px);
-    max-height: calc(100vh - 16px);
+    height: min(82vh, 620px);
+    max-height: calc(100vh - 24px);
 
     .popup-content {
       min-width: 0;
