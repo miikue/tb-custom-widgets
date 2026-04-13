@@ -469,7 +469,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       colorIndex++;
     }
 
-    this.chart.setOption({ series: updatedSeries }, { replaceMerge: ['series'], lazyUpdate: true });
+    this.chart.setOption({ series: updatedSeries, animation: false }, { replaceMerge: ['series'], lazyUpdate: true });
   }
 
   private initializeWorker(): void {
@@ -618,8 +618,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
       series: echartsSeriesData
     };
 
-    this.chart.setOption(this.chartOption, { notMerge: true });
-    this.resetZoomTracking();
+    this.chart.setOption(this.chartOption, { replaceMerge: ['series'], lazyUpdate: true, animation: false });
   }
 
   private buildLegendOption(data: string[]): any {

@@ -85,7 +85,7 @@
 }
 
 .flow-bubble--grid-home {
-  fill: #2b38eb;
+  fill: color-mix(in srgb, var(--grid) 72%, var(--home) 28%);
 }
 
 .energy-node {
