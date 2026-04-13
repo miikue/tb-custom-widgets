@@ -1058,19 +1058,20 @@ export class MiikueSpotrebaGrafKwhEngineComponent implements AfterViewInit, OnCh
   }
 
   private formatYAxisLabel(value: number): string {
-    return this.formatPowerValue(value);
+    return this.formatPowerValue(value, 1);
   }
 
-  private formatPowerValue(value: unknown): string {
+  private formatPowerValue(value: unknown, decimals = 3): string {
     const numeric = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(numeric)) {
       return String(value ?? '');
     }
 
     const normalized = Math.abs(numeric) < this.exportZeroEpsilon * 10 ? 0 : numeric;
-    const rounded = Math.round(normalized * 1000) / 1000;
+    const precisionFactor = Math.pow(10, decimals);
+    const rounded = Math.round(normalized * precisionFactor) / precisionFactor;
     const safeRounded = Object.is(rounded, -0) ? 0 : rounded;
-    return `${safeRounded.toFixed(3)} kW`;
+    return `${safeRounded.toFixed(decimals)} kW`;
   }
 
   private getCurrentZoomRange(): { start: number; end: number } {

@@ -716,7 +716,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
   }
 
   private formatYAxisLabel(value: number): string {
-    return this.formatNumericValue(value, this.resolveDefaultDecimals(), this.resolveDefaultUnits());
+    return this.formatNumericValue(value, 1, this.resolveDefaultUnits());
   }
 
   private formatSeriesValue(seriesName: string, value: any): string {
