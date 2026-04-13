@@ -102,6 +102,8 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
     }
 
     const chartElement = this.chartContainer.nativeElement;
+    // Let ECharts fully manage touch gestures on the chart surface.
+    chartElement.style.touchAction = 'none';
     //console.log('[MiikueChartEngine] Chart element:', chartElement);
 
     // Initialize echarts
@@ -290,7 +292,12 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
         {
           type: 'inside',
           realtime: true,
-          filterMode: 'none'
+          filterMode: 'none',
+          zoomOnMouseWheel: true,
+          moveOnMouseMove: true,
+          moveOnMouseWheel: true,
+          preventDefaultMouseMove: true,
+          throttle: 30
         },
         {
           type: 'slider',
