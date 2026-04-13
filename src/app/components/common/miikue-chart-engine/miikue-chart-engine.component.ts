@@ -58,7 +58,7 @@ export class MiikueChartEngineComponent implements AfterViewInit, OnChanges, OnD
 
   @ViewChild('chartContainer', { static: false }) chartContainer: ElementRef;
 
-  @Input() ctx: MiikueChartEngineCtx;
+  @Input() ctx!: MiikueChartEngineCtx;
 
   private chart: any = null;
   private resizeObserver: ResizeObserver | null = null;

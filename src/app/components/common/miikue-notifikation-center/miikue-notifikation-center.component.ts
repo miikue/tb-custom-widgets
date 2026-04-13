@@ -36,7 +36,7 @@ interface NotificationApiItem {
 })
 export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
 
-  @Input() ctx: WidgetContext;
+  @Input() ctx!: WidgetContext;
 
   public isWidgetExpanded = false;
   public unreadCount = 0;
@@ -311,8 +311,10 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
       await this.apiPut<void>(url, {});
       
       // Mark all as read locally
-      this.notifications.forEach(n => n.read = true);
-      this.notifications.forEach(n => n.status = 'READ');
+      this.notifications.forEach(n => {
+        n.read = true;
+        n.status = 'READ';
+      });
       this.unreadCount = 0;
       
       this.ctx?.detectChanges?.();
@@ -365,10 +367,17 @@ export class MiikueNotifikationCenterComponent implements OnInit, OnDestroy {
         }
 
         const batchSize = 10;
+        let deletedInThisPass = 0;
         for (let i = 0; i < ids.length; i += batchSize) {
           const batch = ids.slice(i, i + batchSize);
           const batchDeletes = batch.map((itemId) => this.deleteNotificationById(itemId));
-          await Promise.allSettled(batchDeletes);
+          const results = await Promise.allSettled(batchDeletes);
+          deletedInThisPass += results.filter((result) => result.status === 'fulfilled').length;
+        }
+
+        // Prevent endless looping when API keeps returning undeletable items.
+        if (deletedInThisPass === 0) {
+          break;
         }
       }
 
