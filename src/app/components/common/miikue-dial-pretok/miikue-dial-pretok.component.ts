@@ -50,6 +50,7 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
   statusText: string = 'NEČINNÉ';
   
   ticks: any[] = [];
+  private tickSignature = '';
 
   constructor(private cd: ChangeDetectorRef) {}
 
@@ -160,7 +161,7 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
 
   public refreshDisplay(): void {
     this.updateState();
-    this.generateTicks();
+    this.ensureTicksUpToDate();
   }
 
   private formatTruncated(value: number, decimals: number): string {
@@ -270,6 +271,16 @@ export class MiikueDialPretokComponent implements OnInit, OnChanges {
         }
       });
     });
+
+    this.tickSignature = `${resolvedLimit}`;
+  }
+
+  private ensureTicksUpToDate(): void {
+    const resolvedLimit = this.resolveMaxLimit();
+    const targetSignature = `${resolvedLimit}`;
+    if (!this.ticks.length || targetSignature !== this.tickSignature) {
+      this.generateTicks();
+    }
   }
 
   private resolveMaxLimit(): number {

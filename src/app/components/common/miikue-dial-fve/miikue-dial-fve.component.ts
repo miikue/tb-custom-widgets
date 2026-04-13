@@ -50,7 +50,6 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
 
   // Calculated properties
   activeOffset: number = 251; // Max length of arc (pi * 80)
-    mainScaleLimit: number = 300;
   
   displayValue: string = '0';
   displayQValue: string = '0';
@@ -299,7 +298,6 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
     const centerX = 100;
     const centerY = 100;
     const limit = this.resolveMaxLimit();
-    this.mainScaleLimit = limit;
     
     // 1. Main Ticks (Values) - Outer half of track (r80-r88)
     this.ticks = [];
@@ -390,6 +388,6 @@ export class MiikueDialFveComponent implements OnInit, OnChanges {
         if (Number.isFinite(parsed) && parsed > 0) {
             return parsed;
         }
-        return 300;
+        return this.defaultMaxLimit;
     }
 }
